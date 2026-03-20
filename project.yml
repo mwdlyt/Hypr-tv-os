@@ -14,8 +14,8 @@ settings:
     CURRENT_PROJECT_VERSION: "1"
 
 packages:
-  MobileVLCKit:
-    url: https://code.videolan.org/nichos/MobileVLCKit-SPM.git
+  VLCKitSPM:
+    url: https://github.com/tylerjonesio/vlckit-spm.git
     version: 3.6.0
 
 targets:
@@ -36,5 +36,5 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: false
     dependencies:
-      - package: MobileVLCKit
-        product: MobileVLCKit
+      - package: VLCKitSPM
+        product: VLCKitSPM

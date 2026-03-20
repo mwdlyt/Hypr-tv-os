@@ -1,7 +1,7 @@
 import Foundation
 import UIKit
 import AVFoundation
-import MobileVLCKit
+import VLCKitSPM
 import os
 
 // MARK: - VLCPlayerWrapper
