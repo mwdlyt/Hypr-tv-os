@@ -9,59 +9,56 @@ struct RootView: View {
 
         Group {
             if jellyfinClient.isAuthenticated {
-                NavigationStack(path: $router.path) {
-                    HomeView()
-                        .toolbar {
-                            ToolbarItemGroup(placement: .topBarLeading) {
-                                Button {
-                                    router.popToRoot()
-                                } label: {
-                                    Text("Hypr")
-                                        .font(.title3)
-                                        .fontWeight(.bold)
-                                }
-                                .buttonStyle(.plain)
+                TabView {
+                    // Home tab
+                    NavigationStack(path: $router.path) {
+                        HomeView()
+                            .navigationDestination(for: AppRouter.Destination.self) { destination in
+                                destinationView(for: destination)
                             }
+                    }
+                    .tabItem {
+                        Label("Home", systemImage: "house.fill")
+                    }
 
-                            ToolbarItemGroup(placement: .topBarTrailing) {
-                                Button {
-                                    router.navigate(to: .search)
-                                } label: {
-                                    Image(systemName: "magnifyingglass")
-                                        .font(.title3)
-                                }
-                                .buttonStyle(.plain)
+                    // Search tab
+                    NavigationStack {
+                        SearchView()
+                    }
+                    .tabItem {
+                        Label("Search", systemImage: "magnifyingglass")
+                    }
 
-                                Button {
-                                    router.navigate(to: .settings)
-                                } label: {
-                                    Image(systemName: "gearshape")
-                                        .font(.title3)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .navigationDestination(for: AppRouter.Destination.self) { destination in
-                            switch destination {
-                            case .home:
-                                HomeView()
-                            case .library(let library):
-                                LibraryView(library: library)
-                            case .mediaDetail(let itemId):
-                                MediaDetailView(itemId: itemId)
-                            case .player(let itemId):
-                                PlayerView(itemId: itemId)
-                            case .search:
-                                SearchView()
-                            case .settings:
-                                SettingsView()
-                            }
-                        }
+                    // Settings tab
+                    NavigationStack {
+                        SettingsView()
+                    }
+                    .tabItem {
+                        Label("Settings", systemImage: "gearshape.fill")
+                    }
                 }
             } else {
                 ServerConnectionView()
             }
         }
         .animation(.easeInOut, value: jellyfinClient.isAuthenticated)
+    }
+
+    @ViewBuilder
+    private func destinationView(for destination: AppRouter.Destination) -> some View {
+        switch destination {
+        case .home:
+            HomeView()
+        case .library(let library):
+            LibraryView(library: library)
+        case .mediaDetail(let itemId):
+            MediaDetailView(itemId: itemId)
+        case .player(let itemId):
+            PlayerView(itemId: itemId)
+        case .search:
+            SearchView()
+        case .settings:
+            SettingsView()
+        }
     }
 }

@@ -1,11 +1,14 @@
 import SwiftUI
 
 /// Horizontal scrolling row of portrait poster cards with section title.
+/// Reports focused item changes to the parent via `onItemFocused`.
 struct MediaRowView: View {
 
     let title: String
     let items: [MediaItemDTO]
     var libraryId: String?
+    /// Called when a poster in this row gains focus.
+    var onItemFocused: ((MediaItemDTO?) -> Void)?
 
     @Environment(AppRouter.self) private var router
 
@@ -16,7 +19,7 @@ struct MediaRowView: View {
                 Text(title)
                     .font(.title3)
                     .fontWeight(.bold)
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(.white)
 
                 Spacer()
 
@@ -35,7 +38,7 @@ struct MediaRowView: View {
                             Image(systemName: "chevron.right")
                                 .font(.caption2)
                         }
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.white.opacity(0.6))
                     }
                     .buttonStyle(.plain)
                 }
@@ -46,7 +49,9 @@ struct MediaRowView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(spacing: Constants.Layout.posterSpacing) {
                     ForEach(items) { item in
-                        MediaCardView(item: item)
+                        MediaCardView(item: item, onFocused: {
+                            onItemFocused?(item)
+                        })
                     }
                 }
                 .padding(.horizontal, Constants.Layout.horizontalPadding)
