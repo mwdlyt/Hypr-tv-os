@@ -1,12 +1,17 @@
 import SwiftUI
 
 /// Sheet presenting a list of available subtitle tracks for the current media.
-/// Includes an "Off" option to disable subtitles.
+/// Includes an "Off" option to disable subtitles, distinguishes embedded from
+/// external subs, and provides a "Download Subtitles" button for OpenSubtitles.
 struct SubtitlePickerView: View {
 
     let viewModel: PlayerViewModel
+    var itemName: String = ""
+    var imdbId: String?
+    var onExternalSubtitleLoaded: ((URL) -> Void)?
 
     @Environment(\.dismiss) private var dismiss
+    @State private var showSubtitleSearch = false
 
     var body: some View {
         NavigationStack {
@@ -65,6 +70,12 @@ struct SubtitlePickerView: View {
                                             .padding(.vertical, 2)
                                             .background(.orange.opacity(0.15), in: RoundedRectangle(cornerRadius: 4))
                                     }
+
+                                    if track.isExternal == true {
+                                        Image(systemName: "arrow.down.circle.fill")
+                                            .font(.caption)
+                                            .foregroundStyle(.cyan)
+                                    }
                                 }
                             }
 
@@ -80,12 +91,43 @@ struct SubtitlePickerView: View {
                     }
                     .buttonStyle(.plain)
                 }
+
+                // Download Subtitles section
+                Section {
+                    Button {
+                        showSubtitleSearch = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "magnifyingglass")
+                                .foregroundStyle(.blue)
+                            Text("Download Subtitles")
+                                .font(.headline)
+                                .foregroundStyle(.blue)
+                            Spacer()
+                            Image(systemName: "arrow.down.circle")
+                                .foregroundStyle(.blue)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                } header: {
+                    Text("OpenSubtitles")
+                }
             }
             .navigationTitle("Subtitles")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }
                 }
+            }
+            .sheet(isPresented: $showSubtitleSearch) {
+                SubtitleSearchView(
+                    itemName: itemName,
+                    imdbId: imdbId,
+                    onSubtitleDownloaded: { fileURL in
+                        onExternalSubtitleLoaded?(fileURL)
+                    }
+                )
             }
         }
     }

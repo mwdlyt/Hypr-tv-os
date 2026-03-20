@@ -18,6 +18,7 @@ enum Endpoint {
     case reportPlaybackStopped
     case search(userId: String, searchTerm: String, startIndex: Int, limit: Int)
     case resumeItems(userId: String, limit: Int)
+    case mediaSegments(itemId: String)
 
     /// The URL path component (without base URL or query string).
     var path: String {
@@ -52,6 +53,8 @@ enum Endpoint {
             return "/Users/\(userId)/Items"
         case .resumeItems(let userId, _):
             return "/Users/\(userId)/Items/Resume"
+        case .mediaSegments(let itemId):
+            return "/MediaSegments"
         }
     }
 
@@ -142,6 +145,11 @@ enum Endpoint {
                 URLQueryItem(name: "Recursive", value: "true"),
                 URLQueryItem(name: "MediaTypes", value: "Video"),
                 URLQueryItem(name: "Fields", value: "Overview,MediaSources,UserData,PrimaryImageAspectRatio")
+            ]
+
+        case .mediaSegments(let itemId):
+            return [
+                URLQueryItem(name: "itemId", value: itemId)
             ]
         }
     }

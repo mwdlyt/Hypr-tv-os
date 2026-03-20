@@ -50,6 +50,8 @@ struct MediaItemDTO: Codable, Identifiable, Hashable {
     let imageTags: [String: String]?
     /// Backdrop image tags for fan art / background images.
     let backdropImageTags: [String]?
+    /// External provider identifiers (e.g. "Imdb" -> "tt1234567", "Tmdb" -> "12345").
+    let providerIds: [String: String]?
 
     enum CodingKeys: String, CodingKey {
         case id = "Id"
@@ -75,6 +77,7 @@ struct MediaItemDTO: Codable, Identifiable, Hashable {
         case userData = "UserData"
         case imageTags = "ImageTags"
         case backdropImageTags = "BackdropImageTags"
+        case providerIds = "ProviderIds"
     }
 
     /// Discriminator for Jellyfin item types.

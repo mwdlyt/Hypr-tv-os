@@ -118,7 +118,8 @@ struct EpisodeRowView: View {
             mediaStreams: nil,
             userData: nil,
             imageTags: nil,
-            backdropImageTags: nil
+            backdropImageTags: nil,
+            providerIds: nil
         )
     ) {
         print("Play episode")

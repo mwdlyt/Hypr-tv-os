@@ -26,9 +26,35 @@ struct PlayerView: View {
                     .ignoresSafeArea()
 
                 // Transport overlay
-                PlayerOverlayView(viewModel: viewModel)
+                PlayerOverlayView(
+                    viewModel: viewModel,
+                    currentItem: currentItem,
+                    onExternalSubtitleLoaded: { fileURL in
+                        playerWrapper.loadExternalSubtitle(fileURL: fileURL)
+                    }
+                )
                     .opacity(viewModel.showOverlay ? 1 : 0)
                     .animation(.easeInOut(duration: 0.3), value: viewModel.showOverlay)
+
+                // Skip button (bottom-right, above Up Next)
+                if let segment = viewModel.currentSegment {
+                    VStack {
+                        Spacer()
+                        HStack {
+                            Spacer()
+                            SkipButton(segment: segment) {
+                                // Seek to end of segment
+                                let seekMs = segment.endTicks / 10_000
+                                playerWrapper.seek(to: seekMs)
+                                viewModel.seek(to: segment.endTicks)
+                            }
+                            .padding(.trailing, 60)
+                            .padding(.bottom, viewModel.showUpNext ? 200 : 80)
+                        }
+                    }
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+                    .animation(.easeInOut(duration: 0.3), value: viewModel.currentSegment?.id)
+                }
 
                 // Up Next overlay (bottom-right corner)
                 if viewModel.showUpNext, let nextEp = viewModel.nextEpisode {
@@ -65,6 +91,14 @@ struct PlayerView: View {
                     playerWrapper.playURL(streamURL)
                     await vm.reportStart()
 
+                    // Load external subtitle streams into VLC
+                    for sub in vm.externalSubtitleURLs() {
+                        playerWrapper.loadExternalSubtitle(url: sub.url)
+                    }
+
+                    // Load media segments for skip intro/outro
+                    await vm.loadSegments()
+
                     // Load the current item details and pre-fetch next episode
                     if let item = try? await jellyfinClient.getItem(id: itemId) {
                         currentItem = item
@@ -82,6 +116,7 @@ struct PlayerView: View {
             playerWrapper.stop()
         }
         .onChange(of: viewModel?.currentTime) { _, _ in
+            viewModel?.checkSegmentOverlay()
             viewModel?.checkUpNextTrigger()
 
             // Check if playback ended — auto-advance to next
