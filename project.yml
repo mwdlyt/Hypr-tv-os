@@ -1,0 +1,40 @@
+name: HyprTV
+options:
+  bundleIdPrefix: com.hypr
+  deploymentTarget:
+    tvOS: "17.0"
+  xcodeVersion: "15.0"
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    TARGETED_DEVICE_FAMILY: "3"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+packages:
+  MobileVLCKit:
+    url: https://code.videolan.org/nichos/MobileVLCKit-SPM.git
+    version: 3.6.0
+
+targets:
+  HyprTV:
+    type: application
+    platform: tvOS
+    sources:
+      - path: HyprTV
+        excludes:
+          - "Preview Content"
+      - path: HyprTV/Preview Content
+        buildPhase: none
+    settings:
+      base:
+        INFOPLIST_FILE: HyprTV/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.hypr.tv
+        DEVELOPMENT_ASSET_PATHS: "\"HyprTV/Preview Content\""
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        GENERATE_INFOPLIST_FILE: false
+    dependencies:
+      - package: MobileVLCKit
+        product: MobileVLCKit
