@@ -10,7 +10,7 @@ enum Endpoint {
     case latestItems(userId: String, parentId: String?, limit: Int)
     case items(userId: String, parentId: String?, startIndex: Int, limit: Int,
                sortBy: String?, sortOrder: String?, includeItemTypes: String?, recursive: Bool,
-               maxOfficialRating: String?)
+               maxOfficialRating: String?, genreIds: String?, officialRatings: String?, nameStartsWith: String?)
     case item(userId: String, itemId: String)
     case seasons(userId: String, seriesId: String)
     case episodes(userId: String, seriesId: String, seasonId: String)
@@ -21,6 +21,12 @@ enum Endpoint {
     case reportPlaybackStopped
     case search(userId: String, searchTerm: String, startIndex: Int, limit: Int, maxOfficialRating: String?)
     case resumeItems(userId: String, limit: Int)
+    case similarItems(userId: String, itemId: String, limit: Int)
+    case genres(userId: String, parentId: String?)
+    case markPlayed(userId: String, itemId: String)
+    case markUnplayed(userId: String, itemId: String)
+    case favorite(userId: String, itemId: String)
+    case unfavorite(userId: String, itemId: String)
 
     /// The URL path component (without base URL or query string).
     var path: String {
@@ -35,7 +41,7 @@ enum Endpoint {
             return "/Users/\(userId)/Views"
         case .latestItems(let userId, _, _):
             return "/Users/\(userId)/Items/Latest"
-        case .items(let userId, _, _, _, _, _, _, _, _):
+        case .items(let userId, _, _, _, _, _, _, _, _, _, _, _):
             return "/Users/\(userId)/Items"
         case .item(let userId, let itemId):
             return "/Users/\(userId)/Items/\(itemId)"
@@ -57,6 +63,18 @@ enum Endpoint {
             return "/Users/\(userId)/Items"
         case .resumeItems(let userId, _):
             return "/Users/\(userId)/Items/Resume"
+        case .similarItems(_, let itemId, _):
+            return "/Items/\(itemId)/Similar"
+        case .genres:
+            return "/Genres"
+        case .markPlayed(let userId, let itemId):
+            return "/Users/\(userId)/PlayedItems/\(itemId)"
+        case .markUnplayed(let userId, let itemId):
+            return "/Users/\(userId)/PlayedItems/\(itemId)"
+        case .favorite(let userId, let itemId):
+            return "/Users/\(userId)/FavoriteItems/\(itemId)"
+        case .unfavorite(let userId, let itemId):
+            return "/Users/\(userId)/FavoriteItems/\(itemId)"
         }
     }
 
@@ -67,8 +85,13 @@ enum Endpoint {
              .playbackInfo,
              .reportPlaybackStart,
              .reportPlaybackProgress,
-             .reportPlaybackStopped:
+             .reportPlaybackStopped,
+             .markPlayed,
+             .favorite:
             return "POST"
+        case .markUnplayed,
+             .unfavorite:
+            return "DELETE"
         default:
             return "GET"
         }
@@ -78,9 +101,15 @@ enum Endpoint {
     private var queryItems: [URLQueryItem] {
         switch self {
         case .publicServerInfo, .publicUsers, .authenticateByName,
-             .userViews, .item,
-             .reportPlaybackStart, .reportPlaybackProgress, .reportPlaybackStopped:
+             .userViews,
+             .reportPlaybackStart, .reportPlaybackProgress, .reportPlaybackStopped,
+             .markPlayed, .markUnplayed, .favorite, .unfavorite:
             return []
+
+        case .item:
+            return [
+                URLQueryItem(name: "Fields", value: "People,Overview,Genres,CommunityRating,OfficialRating,RunTimeTicks,MediaStreams,Studios,UserData,PrimaryImageAspectRatio")
+            ]
 
         case .latestItems(_, let parentId, let limit):
             var items = [URLQueryItem(name: "Limit", value: "\(limit)")]
@@ -91,7 +120,8 @@ enum Endpoint {
             return items
 
         case .items(_, let parentId, let startIndex, let limit,
-                    let sortBy, let sortOrder, let includeItemTypes, let recursive, let maxOfficialRating):
+                    let sortBy, let sortOrder, let includeItemTypes, let recursive,
+                    let maxOfficialRating, let genreIds, let officialRatings, let nameStartsWith):
             var items: [URLQueryItem] = [
                 URLQueryItem(name: "StartIndex", value: "\(startIndex)"),
                 URLQueryItem(name: "Limit", value: "\(limit)"),
@@ -103,6 +133,9 @@ enum Endpoint {
             if let sortOrder { items.append(URLQueryItem(name: "SortOrder", value: sortOrder)) }
             if let includeItemTypes { items.append(URLQueryItem(name: "IncludeItemTypes", value: includeItemTypes)) }
             if let maxOfficialRating { items.append(URLQueryItem(name: "MaxOfficialRating", value: maxOfficialRating)) }
+            if let genreIds { items.append(URLQueryItem(name: "GenreIds", value: genreIds)) }
+            if let officialRatings { items.append(URLQueryItem(name: "OfficialRating", value: officialRatings)) }
+            if let nameStartsWith { items.append(URLQueryItem(name: "NameStartsWith", value: nameStartsWith)) }
             return items
 
         case .seasons(let userId, _):
@@ -151,6 +184,22 @@ enum Endpoint {
                 URLQueryItem(name: "MediaTypes", value: "Video"),
                 URLQueryItem(name: "Fields", value: "Overview,MediaSources,UserData,PrimaryImageAspectRatio")
             ]
+
+        case .similarItems(let userId, _, let limit):
+            return [
+                URLQueryItem(name: "UserId", value: userId),
+                URLQueryItem(name: "Limit", value: "\(limit)"),
+                URLQueryItem(name: "Fields", value: "Overview,UserData,PrimaryImageAspectRatio")
+            ]
+
+        case .genres(let userId, let parentId):
+            var items: [URLQueryItem] = [
+                URLQueryItem(name: "UserId", value: userId)
+            ]
+            if let parentId {
+                items.append(URLQueryItem(name: "ParentId", value: parentId))
+            }
+            return items
         }
     }
 

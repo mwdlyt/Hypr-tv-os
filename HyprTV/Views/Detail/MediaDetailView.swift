@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// Full metadata detail view for a movie, series, or episode.
-/// Displays backdrop, metadata, play button, and series-specific content (seasons/episodes).
+/// Premium layout with backdrop, poster+metadata side-by-side, cast, genres,
+/// season/episode browser, watch/favorite actions, and similar items.
 struct MediaDetailView: View {
 
     let itemId: String
@@ -40,29 +41,23 @@ struct MediaDetailView: View {
     private func detailContent(item: MediaItemDTO, viewModel: MediaDetailViewModel) -> some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                // MARK: Backdrop
-                backdropView(item: item)
+                // MARK: Backdrop + Poster/Metadata overlay
+                backdropWithMetadata(item: item, viewModel: viewModel)
 
-                // MARK: Metadata + Actions
-                VStack(alignment: .leading, spacing: 32) {
-                    // Title and Metadata
-                    titleSection(item: item)
-
-                    // Action Buttons
-                    actionButtons(item: item)
-
+                // MARK: Below-the-fold content
+                VStack(alignment: .leading, spacing: 40) {
                     // Overview
                     if let overview = item.overview, !overview.isEmpty {
                         Text(overview)
                             .font(.body)
                             .foregroundStyle(.secondary)
-                            .lineLimit(6)
-                            .frame(maxWidth: 800, alignment: .leading)
+                            .lineLimit(8)
+                            .frame(maxWidth: 900, alignment: .leading)
                     }
 
                     // Genre Tags
                     if let genres = item.genres, !genres.isEmpty {
-                        genreTagsView(genres: genres)
+                        GenreTagsView(genres: genres)
                     }
 
                     // Series: Season Picker + Episodes
@@ -72,21 +67,32 @@ struct MediaDetailView: View {
 
                     // Cast & Crew
                     if let people = item.people, !people.isEmpty {
-                        castSection(people: people)
+                        CastCrewRow(people: people)
+                    }
+
+                    // Studios
+                    if let studios = item.studios, !studios.isEmpty {
+                        studiosSection(studios: studios)
+                    }
+
+                    // Similar Items
+                    if !viewModel.similarItems.isEmpty {
+                        similarItemsSection(items: viewModel.similarItems)
                     }
                 }
                 .padding(.horizontal, 60)
-                .padding(.top, 32)
-                .padding(.bottom, 60)
+                .padding(.top, 40)
+                .padding(.bottom, 80)
             }
         }
         .ignoresSafeArea(edges: .top)
     }
 
-    // MARK: - Backdrop
+    // MARK: - Backdrop with Poster & Metadata
 
-    private func backdropView(item: MediaItemDTO) -> some View {
+    private func backdropWithMetadata(item: MediaItemDTO, viewModel: MediaDetailViewModel) -> some View {
         ZStack(alignment: .bottomLeading) {
+            // Background backdrop
             if let backdropURL = backdropURL(for: item) {
                 AsyncImage(url: backdropURL) { phase in
                     switch phase {
@@ -94,7 +100,7 @@ struct MediaDetailView: View {
                         image
                             .resizable()
                             .aspectRatio(contentMode: .fill)
-                            .frame(height: 600)
+                            .frame(height: 700)
                             .clipped()
                     case .failure, .empty:
                         backdropPlaceholder
@@ -108,20 +114,62 @@ struct MediaDetailView: View {
 
             // Gradient overlay for readability
             LinearGradient(
-                colors: [.clear, .black.opacity(0.8)],
+                colors: [.clear, .clear, .black.opacity(0.7), .black],
                 startPoint: .top,
                 endPoint: .bottom
             )
-            .frame(height: 300)
-            .frame(maxHeight: .infinity, alignment: .bottom)
+            .frame(height: 700)
+
+            // Poster + Metadata side-by-side
+            HStack(alignment: .bottom, spacing: 40) {
+                // Movie/Show Poster
+                posterView(item: item)
+
+                // Metadata column
+                VStack(alignment: .leading, spacing: 16) {
+                    // Series name (for episodes)
+                    if let seriesName = item.seriesName {
+                        Text(seriesName)
+                            .font(.title3)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    // Title
+                    Text(item.name)
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+
+                    // Metadata badges row
+                    metadataRow(item: item)
+
+                    // Action Buttons
+                    actionButtons(item: item, viewModel: viewModel)
+                }
+
+                Spacer()
+            }
+            .padding(.horizontal, 60)
+            .padding(.bottom, 40)
         }
-        .frame(height: 600)
+        .frame(height: 700)
+    }
+
+    // MARK: - Poster
+
+    private func posterView(item: MediaItemDTO) -> some View {
+        AsyncPosterImage(
+            url: posterURL(for: item),
+            width: 240,
+            height: 360
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.5), radius: 20, y: 10)
     }
 
     private var backdropPlaceholder: some View {
         Rectangle()
             .fill(.ultraThinMaterial)
-            .frame(height: 600)
+            .frame(height: 700)
             .overlay {
                 Image(systemName: "photo")
                     .font(.system(size: 60))
@@ -129,70 +177,55 @@ struct MediaDetailView: View {
             }
     }
 
-    // MARK: - Title Section
+    // MARK: - Metadata Row
 
-    private func titleSection(item: MediaItemDTO) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Series name (for episodes)
-            if let seriesName = item.seriesName {
-                Text(seriesName)
-                    .font(.title3)
+    private func metadataRow(item: MediaItemDTO) -> some View {
+        HStack(spacing: 16) {
+            if let year = item.productionYear {
+                Text(String(year))
+                    .font(.headline)
                     .foregroundStyle(.secondary)
             }
 
-            // Title
-            Text(item.name)
-                .font(.title)
-                .fontWeight(.bold)
-
-            // Metadata row
-            HStack(spacing: 16) {
-                if let year = item.productionYear {
-                    Text(String(year))
-                        .font(.headline)
-                        .foregroundStyle(.secondary)
+            if let rating = item.communityRating {
+                HStack(spacing: 4) {
+                    Image(systemName: "star.fill")
+                        .foregroundStyle(.yellow)
+                    Text(String(format: "%.1f", rating))
                 }
+                .font(.headline)
+                .foregroundStyle(.secondary)
+            }
 
-                if let rating = item.communityRating {
-                    HStack(spacing: 4) {
-                        Image(systemName: "star.fill")
-                            .foregroundStyle(.yellow)
-                        Text(String(format: "%.1f", rating))
-                    }
+            if let officialRating = item.officialRating {
+                Text(officialRating)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 6))
+            }
+
+            if let runtime = TimeFormatter.runtime(from: item.runTimeTicks) {
+                Label(runtime, systemImage: "clock")
                     .font(.headline)
                     .foregroundStyle(.secondary)
-                }
+            }
 
-                if let officialRating = item.officialRating {
-                    Text(officialRating)
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 6))
-                }
-
-                if let runtime = TimeFormatter.runtime(from: item.runTimeTicks) {
-                    Label(runtime, systemImage: "clock")
-                        .font(.headline)
-                        .foregroundStyle(.secondary)
-                }
-
-                // Episode indicator
-                if item.type == .episode,
-                   let season = item.parentIndexNumber,
-                   let episode = item.indexNumber {
-                    Text("S\(season) E\(episode)")
-                        .font(.headline)
-                        .foregroundStyle(.secondary)
-                }
+            // Episode indicator
+            if item.type == .episode,
+               let season = item.parentIndexNumber,
+               let episode = item.indexNumber {
+                Text("S\(season) E\(episode)")
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
             }
         }
     }
 
     // MARK: - Action Buttons
 
-    private func actionButtons(item: MediaItemDTO) -> some View {
+    private func actionButtons(item: MediaItemDTO, viewModel: MediaDetailViewModel) -> some View {
         HStack(spacing: 20) {
             // Play Button
             Button {
@@ -219,28 +252,32 @@ struct MediaDetailView: View {
                 }
                 .buttonStyle(.card)
             }
-        }
-    }
 
-    // MARK: - Genre Tags
-
-    private func genreTagsView(genres: [String]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Genres")
+            // Mark Watched / Unwatched
+            Button {
+                Task { await viewModel.togglePlayed() }
+            } label: {
+                Label(
+                    viewModel.isPlayed ? "Watched" : "Unwatched",
+                    systemImage: viewModel.isPlayed ? "checkmark.circle.fill" : "checkmark.circle"
+                )
                 .font(.headline)
-                .foregroundStyle(.secondary)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(genres, id: \.self) { genre in
-                        Text(genre)
-                            .font(.callout)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(.ultraThinMaterial, in: Capsule())
-                    }
-                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 14)
             }
+            .buttonStyle(.card)
+
+            // Favorite
+            Button {
+                Task { await viewModel.toggleFavorite() }
+            } label: {
+                Image(systemName: viewModel.isFavorite ? "heart.fill" : "heart")
+                    .font(.title3)
+                    .foregroundStyle(viewModel.isFavorite ? .red : .white)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 14)
+            }
+            .buttonStyle(.card)
         }
     }
 
@@ -276,40 +313,32 @@ struct MediaDetailView: View {
         }
     }
 
-    // MARK: - Cast Section
+    // MARK: - Studios Section
 
-    private func castSection(people: [PersonDTO]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Cast & Crew")
+    private func studiosSection(studios: [StudioDTO]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Studios")
+                .font(.headline)
+                .foregroundStyle(.secondary)
+
+            Text(studios.map(\.name).joined(separator: " \u{2022} "))
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - Similar Items
+
+    private func similarItemsSection(items: [MediaItemDTO]) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("More Like This")
                 .font(.title3)
                 .fontWeight(.semibold)
 
             ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 20) {
-                    ForEach(people, id: \.id) { person in
-                        VStack(spacing: 6) {
-                            Circle()
-                                .fill(.ultraThinMaterial)
-                                .frame(width: 80, height: 80)
-                                .overlay {
-                                    Image(systemName: "person.fill")
-                                        .font(.title2)
-                                        .foregroundStyle(.tertiary)
-                                }
-
-                            Text(person.name)
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .lineLimit(1)
-
-                            if let role = person.role, !role.isEmpty {
-                                Text(role)
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                            }
-                        }
-                        .frame(width: 100)
+                LazyHStack(spacing: Constants.Layout.posterSpacing) {
+                    ForEach(items) { similarItem in
+                        MediaCardView(item: similarItem)
                     }
                 }
                 .padding(.vertical, 8)
@@ -330,6 +359,24 @@ struct MediaDetailView: View {
             )
         }
         return nil
+    }
+
+    private func posterURL(for item: MediaItemDTO) -> URL? {
+        // For episodes, use the series poster
+        if item.type == .episode, let seriesId = item.seriesId {
+            return jellyfinClient.imageURL(
+                itemId: seriesId,
+                imageType: "Primary",
+                maxWidth: Constants.Images.posterMaxWidth
+            )
+        }
+        let tag = item.imageTags?["Primary"]
+        return jellyfinClient.imageURL(
+            itemId: item.id,
+            imageType: "Primary",
+            maxWidth: Constants.Images.posterMaxWidth,
+            tag: tag
+        )
     }
 }
 

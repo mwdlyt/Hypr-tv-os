@@ -3,7 +3,7 @@ import Foundation
 // MARK: - MediaDetailViewModel
 
 /// Loads full metadata for a single media item and, for series, manages
-/// season/episode navigation.
+/// season/episode navigation. Also handles similar items, watch status, and favorites.
 @Observable
 final class MediaDetailViewModel {
 
@@ -13,6 +13,7 @@ final class MediaDetailViewModel {
     var seasons: [MediaItemDTO] = []
     var episodes: [MediaItemDTO] = []
     var selectedSeason: MediaItemDTO?
+    var similarItems: [MediaItemDTO] = []
     var isLoading: Bool = false
     var error: String?
 
@@ -24,6 +25,13 @@ final class MediaDetailViewModel {
     var isSeries: Bool {
         item?.type == .series
     }
+
+    // MARK: - Optimistic UI State
+
+    /// Locally tracked played state for optimistic updates.
+    var isPlayed: Bool = false
+    /// Locally tracked favorite state for optimistic updates.
+    var isFavorite: Bool = false
 
     // MARK: - Dependencies
 
@@ -49,9 +57,16 @@ final class MediaDetailViewModel {
             let fetchedItem = try await client.getItem(id: itemId)
             item = fetchedItem
 
+            // Sync optimistic state from server data
+            isPlayed = fetchedItem.userData?.played ?? false
+            isFavorite = fetchedItem.userData?.isFavorite ?? false
+
             if fetchedItem.type == .series {
                 await loadSeasons(for: fetchedItem.id)
             }
+
+            // Load similar items in background
+            await loadSimilarItems()
         } catch {
             self.error = "Failed to load details: \(error.localizedDescription)"
         }
@@ -79,6 +94,55 @@ final class MediaDetailViewModel {
         guard season.id != selectedSeason?.id else { return }
         selectedSeason = season
         await loadEpisodes(seasonId: season.id)
+    }
+
+    // MARK: - Similar Items
+
+    private func loadSimilarItems() async {
+        do {
+            similarItems = try await client.getSimilarItems(itemId: itemId)
+        } catch {
+            // Non-fatal: similar items are optional
+            similarItems = []
+        }
+    }
+
+    // MARK: - Watch Status (Optimistic)
+
+    /// Toggles the played/watched state with optimistic UI update.
+    func togglePlayed() async {
+        let previousState = isPlayed
+        isPlayed.toggle()
+
+        do {
+            if isPlayed {
+                try await client.markPlayed(itemId: itemId)
+            } else {
+                try await client.markUnplayed(itemId: itemId)
+            }
+        } catch {
+            // Revert on failure
+            isPlayed = previousState
+            self.error = "Failed to update watch status: \(error.localizedDescription)"
+        }
+    }
+
+    /// Toggles the favorite state with optimistic UI update.
+    func toggleFavorite() async {
+        let previousState = isFavorite
+        isFavorite.toggle()
+
+        do {
+            if isFavorite {
+                try await client.favorite(itemId: itemId)
+            } else {
+                try await client.unfavorite(itemId: itemId)
+            }
+        } catch {
+            // Revert on failure
+            isFavorite = previousState
+            self.error = "Failed to update favorite: \(error.localizedDescription)"
+        }
     }
 
     // MARK: - Private Helpers
