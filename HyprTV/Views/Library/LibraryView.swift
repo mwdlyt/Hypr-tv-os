@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Grid view of all items in a media library with sorting controls.
+/// Grid view of all items in a media library with sorting, filtering, and alphabet quick-jump.
 /// Supports infinite scrolling with prefetching — items load before the user reaches the end.
 struct LibraryView: View {
 
@@ -19,10 +19,10 @@ struct LibraryView: View {
             if let viewModel {
                 if viewModel.isLoading && viewModel.items.isEmpty {
                     LoadingView(message: "Loading \(library.name)...")
-                } else if viewModel.items.isEmpty {
+                } else if viewModel.items.isEmpty && !viewModel.hasActiveFilters {
                     emptyState
                 } else {
-                    gridContent(viewModel: viewModel)
+                    libraryContent(viewModel: viewModel)
                 }
             } else {
                 LoadingView()
@@ -33,46 +33,131 @@ struct LibraryView: View {
             if viewModel == nil {
                 let vm = LibraryViewModel(client: jellyfinClient, library: library)
                 viewModel = vm
-                await vm.loadItems()
+                async let itemsLoad: () = vm.loadItems()
+                async let genresLoad: () = vm.loadGenres()
+                _ = await (itemsLoad, genresLoad)
             }
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 if let viewModel {
-                    sortMenu(viewModel: viewModel)
+                    HStack(spacing: 16) {
+                        filterToggleButton(viewModel: viewModel)
+                        sortMenu(viewModel: viewModel)
+                    }
                 }
             }
         }
     }
 
-    // MARK: - Grid Content
+    // MARK: - Library Content
 
-    private func gridContent(viewModel: LibraryViewModel) -> some View {
-        ScrollView {
-            LazyVGrid(columns: columns, spacing: 40) {
-                ForEach(viewModel.items) { item in
-                    MediaCardView(item: item)
-                        .onAppear {
-                            viewModel.onItemAppear(item)
+    private func libraryContent(viewModel: LibraryViewModel) -> some View {
+        HStack(spacing: 0) {
+            // Main grid area
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    // Filter bar (collapsible)
+                    if viewModel.showFilters {
+                        LibraryFilterBar(
+                            selectedGenreIds: Binding(
+                                get: { viewModel.selectedGenreIds },
+                                set: { newValue in
+                                    viewModel.selectedGenreIds = newValue
+                                    Task { await viewModel.applyFilters() }
+                                }
+                            ),
+                            selectedRatings: Binding(
+                                get: { viewModel.selectedRatings },
+                                set: { newValue in
+                                    viewModel.selectedRatings = newValue
+                                    Task { await viewModel.applyFilters() }
+                                }
+                            ),
+                            availableGenres: viewModel.availableGenres
+                        )
+                        .padding(.horizontal, 60)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+
+                    // Active filter summary
+                    if viewModel.hasActiveFilters {
+                        HStack {
+                            Text("\(viewModel.totalCount) results")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+
+                            Spacer()
+
+                            Button("Clear All Filters") {
+                                Task { await viewModel.clearFilters() }
+                            }
+                            .font(.subheadline)
                         }
+                        .padding(.horizontal, 60)
+                    }
+
+                    if viewModel.items.isEmpty && viewModel.hasActiveFilters {
+                        VStack(spacing: 16) {
+                            Image(systemName: "line.3.horizontal.decrease.circle")
+                                .font(.system(size: 48))
+                                .foregroundStyle(.secondary)
+                            Text("No items match the current filters")
+                                .font(.title3)
+                                .foregroundStyle(.secondary)
+                            Button("Clear Filters") {
+                                Task { await viewModel.clearFilters() }
+                            }
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 400)
+                    } else {
+                        // Item grid
+                        LazyVGrid(columns: columns, spacing: 40) {
+                            ForEach(viewModel.items) { item in
+                                MediaCardView(item: item)
+                                    .onAppear {
+                                        viewModel.onItemAppear(item)
+                                    }
+                            }
+                        }
+                        .padding(.horizontal, 60)
+                        .padding(.vertical, 32)
+
+                        // Loading indicator at bottom
+                        if viewModel.isLoadingMore {
+                            ProgressView()
+                                .padding(.bottom, 40)
+                        }
+
+                        // Item count footer
+                        if !viewModel.items.isEmpty {
+                            Text("\(viewModel.items.count) of \(viewModel.totalCount) items")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                                .frame(maxWidth: .infinity)
+                                .padding(.bottom, 20)
+                        }
+                    }
                 }
             }
-            .padding(.horizontal, 60)
-            .padding(.vertical, 32)
 
-            // Loading indicator at bottom
-            if viewModel.isLoadingMore {
-                ProgressView()
-                    .padding(.bottom, 40)
+            // Alphabet sidebar
+            AlphabetSidebar { letter in
+                Task { await viewModel.jumpToLetter(letter) }
             }
+            .padding(.trailing, 12)
+        }
+    }
 
-            // Item count footer
-            if !viewModel.items.isEmpty {
-                Text("\(viewModel.items.count) of \(viewModel.totalCount) items")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .padding(.bottom, 20)
+    // MARK: - Filter Toggle
+
+    private func filterToggleButton(viewModel: LibraryViewModel) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.25)) {
+                viewModel.showFilters.toggle()
             }
+        } label: {
+            Label("Filter", systemImage: viewModel.hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
         }
     }
 
@@ -85,6 +170,7 @@ struct LibraryView: View {
                 sortButton(viewModel: viewModel, label: "Date Added", sortBy: "DateCreated")
                 sortButton(viewModel: viewModel, label: "Release Date", sortBy: "PremiereDate")
                 sortButton(viewModel: viewModel, label: "Rating", sortBy: "CommunityRating")
+                sortButton(viewModel: viewModel, label: "Runtime", sortBy: "Runtime")
             }
 
             Section("Order") {

@@ -145,8 +145,8 @@ final class JellyfinClient {
         }
     }
 
-    /// Fire-and-forget POST that ignores the response body (used for playback reporting).
-    private func postIgnoringResponse(_ endpoint: Endpoint, body: Data? = nil) async throws {
+    /// Fire-and-forget request that ignores the response body (used for playback reporting, watch status, favorites).
+    private func requestIgnoringResponse(_ endpoint: Endpoint, body: Data? = nil) async throws {
         guard let baseURL else { throw JellyfinError.noBaseURL }
 
         let url = endpoint.url(baseURL: baseURL)
@@ -220,7 +220,7 @@ final class JellyfinClient {
         return try await request(.latestItems(userId: userId, parentId: parentId, limit: limit))
     }
 
-    /// Queries items with full pagination and filtering support.
+    /// Queries items with full pagination, filtering, and sorting support.
     func getItems(
         parentId: String? = nil,
         startIndex: Int = 0,
@@ -228,7 +228,10 @@ final class JellyfinClient {
         sortBy: String? = nil,
         sortOrder: String? = nil,
         includeItemTypes: String? = nil,
-        recursive: Bool = true
+        recursive: Bool = true,
+        genreIds: String? = nil,
+        officialRatings: String? = nil,
+        nameStartsWith: String? = nil
     ) async throws -> ItemsResponse {
         guard let userId else { throw JellyfinError.notAuthenticated }
         return try await request(.items(
@@ -239,7 +242,10 @@ final class JellyfinClient {
             sortBy: sortBy,
             sortOrder: sortOrder,
             includeItemTypes: includeItemTypes,
-            recursive: recursive
+            recursive: recursive,
+            genreIds: genreIds,
+            officialRatings: officialRatings,
+            nameStartsWith: nameStartsWith
         ))
     }
 
@@ -292,7 +298,7 @@ final class JellyfinClient {
         if let mediaSourceId { body["MediaSourceId"] = mediaSourceId }
         if let playSessionId { body["PlaySessionId"] = playSessionId }
         let data = try JSONSerialization.data(withJSONObject: body)
-        try await postIgnoringResponse(.reportPlaybackStart, body: data)
+        try await requestIgnoringResponse(.reportPlaybackStart, body: data)
     }
 
     /// Reports the current playback position to the server.
@@ -305,7 +311,7 @@ final class JellyfinClient {
         if let mediaSourceId { body["MediaSourceId"] = mediaSourceId }
         if let playSessionId { body["PlaySessionId"] = playSessionId }
         let data = try JSONSerialization.data(withJSONObject: body)
-        try await postIgnoringResponse(.reportPlaybackProgress, body: data)
+        try await requestIgnoringResponse(.reportPlaybackProgress, body: data)
     }
 
     /// Notifies the server that playback has stopped at the given position.
@@ -317,13 +323,12 @@ final class JellyfinClient {
         if let mediaSourceId { body["MediaSourceId"] = mediaSourceId }
         if let playSessionId { body["PlaySessionId"] = playSessionId }
         let data = try JSONSerialization.data(withJSONObject: body)
-        try await postIgnoringResponse(.reportPlaybackStopped, body: data)
+        try await requestIgnoringResponse(.reportPlaybackStopped, body: data)
     }
 
     // MARK: - Search
 
     /// Searches for movies, series, and episodes matching the given query string.
-    /// Returns a full `ItemsResponse` so callers can paginate through large result sets.
     func search(query: String, startIndex: Int = 0, limit: Int = 50) async throws -> ItemsResponse {
         guard let userId else { throw JellyfinError.notAuthenticated }
         return try await request(.search(userId: userId, searchTerm: query, startIndex: startIndex, limit: limit))
@@ -338,16 +343,61 @@ final class JellyfinClient {
         return response.items
     }
 
+    // MARK: - Similar Items
+
+    /// Fetches items similar to the given item.
+    func getSimilarItems(itemId: String, limit: Int = 12) async throws -> [MediaItemDTO] {
+        guard let userId else { throw JellyfinError.notAuthenticated }
+        let response: ItemsResponse = try await request(.similarItems(userId: userId, itemId: itemId, limit: limit))
+        return response.items
+    }
+
+    // MARK: - Genres
+
+    /// Fetches available genres, optionally scoped to a specific library.
+    func getGenres(parentId: String? = nil) async throws -> [GenreDTO] {
+        guard let userId else { throw JellyfinError.notAuthenticated }
+
+        struct GenresResponse: Codable {
+            let items: [GenreDTO]
+            enum CodingKeys: String, CodingKey { case items = "Items" }
+        }
+
+        let response: GenresResponse = try await request(.genres(userId: userId, parentId: parentId))
+        return response.items
+    }
+
+    // MARK: - Watch Status
+
+    /// Marks an item as played/watched.
+    func markPlayed(itemId: String) async throws {
+        guard let userId else { throw JellyfinError.notAuthenticated }
+        try await requestIgnoringResponse(.markPlayed(userId: userId, itemId: itemId))
+    }
+
+    /// Marks an item as unplayed/unwatched.
+    func markUnplayed(itemId: String) async throws {
+        guard let userId else { throw JellyfinError.notAuthenticated }
+        try await requestIgnoringResponse(.markUnplayed(userId: userId, itemId: itemId))
+    }
+
+    // MARK: - Favorites
+
+    /// Adds an item to the user's favorites.
+    func favorite(itemId: String) async throws {
+        guard let userId else { throw JellyfinError.notAuthenticated }
+        try await requestIgnoringResponse(.favorite(userId: userId, itemId: itemId))
+    }
+
+    /// Removes an item from the user's favorites.
+    func unfavorite(itemId: String) async throws {
+        guard let userId else { throw JellyfinError.notAuthenticated }
+        try await requestIgnoringResponse(.unfavorite(userId: userId, itemId: itemId))
+    }
+
     // MARK: - Image URLs
 
     /// Constructs an image URL for the given item and image type.
-    ///
-    /// - Parameters:
-    ///   - itemId: The item whose image to fetch.
-    ///   - imageType: Image type such as "Primary", "Backdrop", "Thumb", "Logo".
-    ///   - maxWidth: Optional maximum width to request a scaled image.
-    ///   - tag: Optional image tag for cache invalidation.
-    /// - Returns: A fully qualified image URL, or nil if the base URL is not set.
     func imageURL(itemId: String, imageType: String = "Primary", maxWidth: Int? = nil, tag: String? = nil) -> URL? {
         guard let baseURL else { return nil }
 
@@ -366,9 +416,6 @@ final class JellyfinClient {
     }
 
     /// Constructs a direct stream URL for playback with authentication baked in.
-    ///
-    /// The returned URL can be handed directly to AVPlayer or VLC. The access token is
-    /// included as a query parameter so no additional auth headers are needed.
     func streamURL(itemId: String, mediaSourceId: String? = nil) -> URL? {
         guard let baseURL, let token = accessToken else { return nil }
 
@@ -387,8 +434,6 @@ final class JellyfinClient {
     // MARK: - Session Restoration
 
     /// Restores a previously saved session without re-authenticating.
-    ///
-    /// Used by `AuthService` to hydrate the client from keychain-stored credentials.
     func restoreSession(baseURL: URL, accessToken: String, userId: String) {
         self.baseURL = baseURL
         self.accessToken = accessToken

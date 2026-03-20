@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - LibraryViewModel
 
-/// Manages paginated browsing of a single Jellyfin library with sorting controls.
+/// Manages paginated browsing of a single Jellyfin library with sorting, filtering, and genre controls.
 ///
 /// Performance strategy:
 /// - Fetches items in pages of 100 using StartIndex + Limit
@@ -20,6 +20,18 @@ final class LibraryViewModel {
     var error: String?
     var sortBy: String = "SortName"
     var sortOrder: String = "Ascending"
+
+    // MARK: - Filtering
+
+    var availableGenres: [GenreDTO] = []
+    var selectedGenreIds: Set<String> = []
+    var selectedRatings: Set<String> = []
+    var showFilters: Bool = false
+
+    /// Whether any filters are currently active.
+    var hasActiveFilters: Bool {
+        !selectedGenreIds.isEmpty || !selectedRatings.isEmpty
+    }
 
     /// The library being browsed.
     let library: LibraryDTO
@@ -61,7 +73,9 @@ final class LibraryViewModel {
                 startIndex: 0,
                 limit: pageSize,
                 sortBy: sortBy,
-                sortOrder: sortOrder
+                sortOrder: sortOrder,
+                genreIds: genreIdsParam,
+                officialRatings: officialRatingsParam
             )
 
             items = response.items
@@ -90,7 +104,9 @@ final class LibraryViewModel {
                 startIndex: currentStartIndex,
                 limit: pageSize,
                 sortBy: sortBy,
-                sortOrder: sortOrder
+                sortOrder: sortOrder,
+                genreIds: genreIdsParam,
+                officialRatings: officialRatingsParam
             )
 
             items.append(contentsOf: response.items)
@@ -131,7 +147,80 @@ final class LibraryViewModel {
         await loadItems()
     }
 
+    // MARK: - Filtering
+
+    /// Applies filters and reloads items from the first page.
+    func applyFilters() async {
+        await loadItems()
+    }
+
+    /// Clears all active filters and reloads.
+    func clearFilters() async {
+        selectedGenreIds.removeAll()
+        selectedRatings.removeAll()
+        await loadItems()
+    }
+
+    // MARK: - Genres
+
+    /// Fetches available genres for this library.
+    func loadGenres() async {
+        do {
+            availableGenres = try await client.getGenres(parentId: library.id)
+        } catch {
+            // Non-fatal
+            availableGenres = []
+        }
+    }
+
+    // MARK: - Alphabet Jump
+
+    /// Reloads items starting with the given letter. Uses NameStartsWith filter.
+    func jumpToLetter(_ letter: String) async {
+        resetPagination()
+        isLoading = true
+        error = nil
+
+        let nameStartsWith = letter == "#" ? nil : letter
+
+        do {
+            let response = try await client.getItems(
+                parentId: library.id,
+                startIndex: 0,
+                limit: pageSize,
+                sortBy: "SortName",
+                sortOrder: "Ascending",
+                nameStartsWith: nameStartsWith
+            )
+
+            items = response.items
+            totalCount = response.totalRecordCount
+            currentStartIndex = response.items.count
+            hasMoreItems = currentStartIndex < totalCount
+
+            // Update sort to match jump context
+            sortBy = "SortName"
+            sortOrder = "Ascending"
+        } catch {
+            self.error = "Failed to jump to letter: \(error.localizedDescription)"
+        }
+
+        isLoading = false
+    }
+
     // MARK: - Private Helpers
+
+    /// Comma-separated genre IDs for the API, or nil if no genres selected.
+    private var genreIdsParam: String? {
+        guard !selectedGenreIds.isEmpty else { return nil }
+        return selectedGenreIds.joined(separator: ",")
+    }
+
+    /// Pipe-separated official ratings for the API, or nil if no ratings selected.
+    private var officialRatingsParam: String? {
+        guard !selectedRatings.isEmpty else { return nil }
+        return selectedRatings.joined(separator: "|")
+    }
 
     private func resetPagination() {
         prefetchTask?.cancel()

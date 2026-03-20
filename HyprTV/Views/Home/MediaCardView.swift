@@ -3,6 +3,7 @@ import SwiftUI
 /// Portrait poster card for a media item.
 /// Shows a tall 2:3 ratio poster with focus-driven scale and title reveal.
 /// Reports focus state to parent for backdrop changes.
+/// Displays watched checkmark and progress bar overlays.
 struct MediaCardView: View {
 
     let item: MediaItemDTO
@@ -17,13 +18,24 @@ struct MediaCardView: View {
             router.navigate(to: .mediaDetail(itemId: item.id))
         } label: {
             VStack(spacing: 10) {
-                // Portrait poster image with progress bar
+                // Portrait poster image with overlays
                 ZStack(alignment: .bottom) {
-                    AsyncPosterImage(
-                        url: posterURL,
-                        width: Constants.Layout.posterWidth,
-                        height: Constants.Layout.posterHeight
-                    )
+                    ZStack(alignment: .topTrailing) {
+                        AsyncPosterImage(
+                            url: posterURL,
+                            width: Constants.Layout.posterWidth,
+                            height: Constants.Layout.posterHeight
+                        )
+
+                        // Watched checkmark overlay
+                        if item.userData?.played == true {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.title3)
+                                .foregroundStyle(.white)
+                                .shadow(color: .black.opacity(0.6), radius: 4)
+                                .padding(8)
+                        }
+                    }
 
                     // Progress bar for partially watched items
                     if let progress = watchProgress, progress > 0 && progress < 1 {

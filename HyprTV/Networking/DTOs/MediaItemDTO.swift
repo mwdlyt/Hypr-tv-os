@@ -119,12 +119,15 @@ struct PersonDTO: Codable, Hashable {
     let role: String?
     /// Person type: "Actor", "Director", "Writer", etc.
     let type: String?
+    /// Image tag for the person's primary photo.
+    let primaryImageTag: String?
 
     enum CodingKeys: String, CodingKey {
         case name = "Name"
         case id = "Id"
         case role = "Role"
         case type = "Type"
+        case primaryImageTag = "PrimaryImageTag"
     }
 }
 
