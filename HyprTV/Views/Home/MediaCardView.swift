@@ -17,12 +17,35 @@ struct MediaCardView: View {
             router.navigate(to: .mediaDetail(itemId: item.id))
         } label: {
             VStack(spacing: 10) {
-                // Portrait poster image
-                AsyncPosterImage(
-                    url: posterURL,
-                    width: Constants.Layout.posterWidth,
-                    height: Constants.Layout.posterHeight
-                )
+                // Portrait poster image with progress bar
+                ZStack(alignment: .bottom) {
+                    AsyncPosterImage(
+                        url: posterURL,
+                        width: Constants.Layout.posterWidth,
+                        height: Constants.Layout.posterHeight
+                    )
+
+                    // Progress bar for partially watched items
+                    if let progress = watchProgress, progress > 0 && progress < 1 {
+                        GeometryReader { geo in
+                            VStack {
+                                Spacer()
+                                ZStack(alignment: .leading) {
+                                    // Background track
+                                    Rectangle()
+                                        .fill(.black.opacity(0.6))
+                                        .frame(height: 4)
+
+                                    // Progress fill
+                                    Rectangle()
+                                        .fill(.blue)
+                                        .frame(width: geo.size.width * progress, height: 4)
+                                }
+                            }
+                        }
+                    }
+                }
+                .frame(width: Constants.Layout.posterWidth, height: Constants.Layout.posterHeight)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .shadow(
                     color: isFocused ? .white.opacity(0.3) : .clear,
@@ -73,6 +96,14 @@ struct MediaCardView: View {
     }
 
     // MARK: - Computed Properties
+
+    /// Returns 0...1 progress for partially watched items, nil if unwatched.
+    private var watchProgress: Double? {
+        guard let ticks = item.userData?.playbackPositionTicks,
+              let totalTicks = item.runTimeTicks,
+              totalTicks > 0, ticks > 0 else { return nil }
+        return Double(ticks) / Double(totalTicks)
+    }
 
     private var displayTitle: String {
         // For episodes, show the series name (e.g. "Rick and Morty") not "E5 - Meeseeks..."
