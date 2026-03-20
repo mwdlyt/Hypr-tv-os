@@ -75,13 +75,23 @@ struct MediaCardView: View {
     // MARK: - Computed Properties
 
     private var displayTitle: String {
-        if item.type == .episode, let ep = item.indexNumber {
-            return "E\(ep) - \(item.name)"
+        // For episodes, show the series name (e.g. "Rick and Morty") not "E5 - Meeseeks..."
+        if item.type == .episode, let seriesName = item.seriesName {
+            return seriesName
         }
         return item.name
     }
 
     private var posterURL: URL? {
+        // For episodes, use the SERIES poster art instead of the episode thumbnail
+        if item.type == .episode, let seriesId = item.seriesId {
+            return jellyfinClient.imageURL(
+                itemId: seriesId,
+                imageType: "Primary",
+                maxWidth: Constants.Images.posterMaxWidth,
+                tag: nil
+            )
+        }
         let tag = item.imageTags?["Primary"]
         return jellyfinClient.imageURL(
             itemId: item.id,

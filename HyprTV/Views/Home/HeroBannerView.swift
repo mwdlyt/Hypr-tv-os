@@ -231,6 +231,15 @@ struct HeroBannerView: View {
     // MARK: - Image Loading
 
     private func posterURL(for item: MediaItemDTO) -> URL? {
+        // For episodes, use the series poster instead of episode thumbnail
+        if item.type == .episode, let seriesId = item.seriesId {
+            return jellyfinClient.imageURL(
+                itemId: seriesId,
+                imageType: "Primary",
+                maxWidth: Constants.Images.posterMaxWidth,
+                tag: nil
+            )
+        }
         let tag = item.imageTags?["Primary"]
         return jellyfinClient.imageURL(
             itemId: item.id,
