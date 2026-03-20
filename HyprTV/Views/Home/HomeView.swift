@@ -1,48 +1,14 @@
 import SwiftUI
 
-/// Main home screen displayed after authentication.
-/// Shows a tab bar with Home and Search, and horizontal media rows for libraries.
+/// Premium home screen with hero spotlight banner and horizontal poster rows.
+/// Replaces the old TabView layout with a cinematic, content-first design.
 struct HomeView: View {
 
     @Environment(JellyfinClient.self) private var jellyfinClient
     @Environment(AppRouter.self) private var router
     @State private var viewModel: HomeViewModel?
-    @State private var selectedTab: HomeTab = .home
-
-    enum HomeTab: Hashable {
-        case home
-        case search
-        case settings
-    }
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            homeContent
-                .tabItem {
-                    Label("Home", systemImage: "house.fill")
-                }
-                .tag(HomeTab.home)
-
-            SearchView()
-                .tabItem {
-                    Label("Search", systemImage: "magnifyingglass")
-                }
-                .tag(HomeTab.search)
-
-            NavigationStack {
-                SettingsView()
-            }
-            .tabItem {
-                Label("Settings", systemImage: "gearshape.fill")
-            }
-            .tag(HomeTab.settings)
-        }
-    }
-
-    // MARK: - Home Content
-
-    @ViewBuilder
-    private var homeContent: some View {
         Group {
             if let viewModel {
                 if viewModel.isLoading && viewModel.sections.isEmpty {
@@ -52,7 +18,7 @@ struct HomeView: View {
                         Task { await viewModel.refresh() }
                     }
                 } else {
-                    mediaRows(viewModel: viewModel)
+                    mainContent(viewModel: viewModel)
                 }
             } else {
                 LoadingView()
@@ -70,21 +36,29 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - Media Rows
+    // MARK: - Main Content
 
-    private func mediaRows(viewModel: HomeViewModel) -> some View {
+    private func mainContent(viewModel: HomeViewModel) -> some View {
         ScrollView(.vertical, showsIndicators: false) {
-            LazyVStack(alignment: .leading, spacing: 40) {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                // Hero spotlight banner
+                if !viewModel.featuredItems.isEmpty {
+                    HeroBannerView(items: viewModel.featuredItems)
+                        .padding(.bottom, Constants.Layout.rowSpacing)
+                }
+
+                // Content rows
                 ForEach(viewModel.sections) { section in
                     MediaRowView(
                         title: section.title,
                         items: section.items,
                         libraryId: section.libraryId
                     )
+                    .padding(.bottom, Constants.Layout.rowSpacing)
                 }
             }
-            .padding(.vertical, 40)
         }
+        .ignoresSafeArea(edges: .top)
     }
 }
 

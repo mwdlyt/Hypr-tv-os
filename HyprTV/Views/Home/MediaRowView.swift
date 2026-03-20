@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Horizontal scrolling row of media cards with a section title and optional "See All" navigation.
+/// Horizontal scrolling row of portrait poster cards with section title.
 struct MediaRowView: View {
 
     let title: String
@@ -10,12 +10,13 @@ struct MediaRowView: View {
     @Environment(AppRouter.self) private var router
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // MARK: Section Header
+        VStack(alignment: .leading, spacing: 14) {
+            // Section header
             HStack(alignment: .firstTextBaseline) {
                 Text(title)
                     .font(.title3)
-                    .fontWeight(.semibold)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.primary)
 
                 Spacer()
 
@@ -32,32 +33,26 @@ struct MediaRowView: View {
                             Text("See All")
                                 .font(.callout)
                             Image(systemName: "chevron.right")
-                                .font(.caption)
+                                .font(.caption2)
                         }
                         .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal, 60)
+            .padding(.horizontal, Constants.Layout.horizontalPadding)
 
-            // MARK: Horizontal Scroll
+            // Horizontal poster scroll
             ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 28) {
+                LazyHStack(spacing: Constants.Layout.posterSpacing) {
                     ForEach(items) { item in
                         MediaCardView(item: item)
                     }
                 }
-                .padding(.horizontal, 60)
+                .padding(.horizontal, Constants.Layout.horizontalPadding)
                 .padding(.vertical, 20)
             }
             .focusSection()
         }
     }
-}
-
-// MARK: - Preview
-
-#Preview {
-    MediaRowView(title: "Continue Watching", items: [], libraryId: nil)
 }

@@ -11,6 +11,36 @@ struct RootView: View {
             if jellyfinClient.isAuthenticated {
                 NavigationStack(path: $router.path) {
                     HomeView()
+                        .toolbar {
+                            ToolbarItemGroup(placement: .topBarLeading) {
+                                Button {
+                                    router.popToRoot()
+                                } label: {
+                                    Text("Hypr")
+                                        .font(.title3)
+                                        .fontWeight(.bold)
+                                }
+                                .buttonStyle(.plain)
+                            }
+
+                            ToolbarItemGroup(placement: .topBarTrailing) {
+                                Button {
+                                    router.navigate(to: .search)
+                                } label: {
+                                    Image(systemName: "magnifyingglass")
+                                        .font(.title3)
+                                }
+                                .buttonStyle(.plain)
+
+                                Button {
+                                    router.navigate(to: .settings)
+                                } label: {
+                                    Image(systemName: "gearshape")
+                                        .font(.title3)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
                         .navigationDestination(for: AppRouter.Destination.self) { destination in
                             switch destination {
                             case .home:

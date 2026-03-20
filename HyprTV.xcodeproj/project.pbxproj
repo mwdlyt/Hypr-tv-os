@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		022295751A80BA55DAC9A2C7 /* MediaCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B06732DDE61E132BC5D04056 /* MediaCardView.swift */; };
+		03A39AED054A09BECEC228EA /* HeroBannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BA980299F9B5C4A31A12046 /* HeroBannerView.swift */; };
 		086FC0E990FDB3ABD33766DF /* AudioSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39E3DBF844C0ECC8C5E90DD1 /* AudioSettings.swift */; };
 		0B770772C3E68DDCAE51115C /* AsyncPosterImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FFB81635B2D488BB9D12D67 /* AsyncPosterImage.swift */; };
 		0CA05762439A5A43C487408D /* PlayerRepresentable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9320CCC064AF2F933E901F2A /* PlayerRepresentable.swift */; };
@@ -80,6 +81,7 @@
 		2BC25637A1CE976AE903777D /* AppRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRouter.swift; sourceTree = "<group>"; };
 		2F533CCB536085682994E92C /* PlayerOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerOverlayView.swift; sourceTree = "<group>"; };
 		39E3DBF844C0ECC8C5E90DD1 /* AudioSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSettings.swift; sourceTree = "<group>"; };
+		3BA980299F9B5C4A31A12046 /* HeroBannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeroBannerView.swift; sourceTree = "<group>"; };
 		3E6B6F34244E2F5AB8663214 /* AuthResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthResponse.swift; sourceTree = "<group>"; };
 		4D69D8C20CE6A340FCFD99AB /* MediaItemDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaItemDTO.swift; sourceTree = "<group>"; };
 		500F160193FDCFECB38481FF /* SearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchView.swift; sourceTree = "<group>"; };
@@ -193,6 +195,7 @@
 		482191CC18D220A2F4ECC197 /* Home */ = {
 			isa = PBXGroup;
 			children = (
+				3BA980299F9B5C4A31A12046 /* HeroBannerView.swift */,
 				E2AC4BE3301B1CEA973D9EEA /* HomeView.swift */,
 				B06732DDE61E132BC5D04056 /* MediaCardView.swift */,
 				0AE391585E01687B69582382 /* MediaRowView.swift */,
@@ -438,6 +441,7 @@
 				67677A1FA457335C8D24A52D /* Endpoint.swift in Sources */,
 				3CC9D2FEE36EA867B5A5C971 /* EpisodeRowView.swift in Sources */,
 				9CA63458F833FA020F994790 /* ErrorView.swift in Sources */,
+				03A39AED054A09BECEC228EA /* HeroBannerView.swift in Sources */,
 				407183C72879767AF4F025DB /* HomeView.swift in Sources */,
 				A7115EB920DF9DC28C2BC0E8 /* HomeViewModel.swift in Sources */,
 				C17056E9DB7950883B20D779 /* HyprTVApp.swift in Sources */,

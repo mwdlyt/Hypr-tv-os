@@ -10,8 +10,8 @@ import SwiftUI
 struct AsyncPosterImage: View {
 
     let url: URL?
-    var width: CGFloat = 220
-    var height: CGFloat = 330
+    var width: CGFloat = Constants.Layout.posterWidth
+    var height: CGFloat = Constants.Layout.posterHeight
 
     @State private var image: UIImage?
     @State private var didFail: Bool = false
@@ -41,7 +41,7 @@ struct AsyncPosterImage: View {
             }
         }
         .frame(width: width, height: height)
-        .cornerRadius(12)
+        .cornerRadius(Constants.Layout.posterCornerRadius)
         .onAppear {
             guard image == nil, !didFail else { return }
             startLoading()
@@ -51,7 +51,6 @@ struct AsyncPosterImage: View {
             loadTask = nil
         }
         .onChange(of: url) { _, newURL in
-            // URL changed (e.g. reused cell) — reload.
             image = nil
             didFail = false
             loadTask?.cancel()
@@ -90,7 +89,7 @@ struct AsyncPosterImage: View {
             .frame(width: width, height: height)
             .overlay {
                 Image(systemName: "film")
-                    .font(.system(size: 40))
+                    .font(.system(size: 32))
                     .foregroundStyle(.tertiary)
             }
     }

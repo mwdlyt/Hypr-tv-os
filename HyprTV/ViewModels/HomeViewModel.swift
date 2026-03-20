@@ -26,6 +26,17 @@ final class HomeViewModel {
     var isLoading: Bool = false
     var error: String?
 
+    /// Featured items for the hero banner. Picks the first items that have backdrop images.
+    var featuredItems: [MediaItemDTO] {
+        let allItems = latestItemsByLibrary.values.flatMap { $0 }
+        let withBackdrops = allItems.filter { item in
+            item.backdropImageTags != nil && !(item.backdropImageTags?.isEmpty ?? true)
+        }
+        // Fall back to any items if none have backdrops
+        let pool = withBackdrops.isEmpty ? Array(allItems) : Array(withBackdrops)
+        return Array(pool.prefix(10))
+    }
+
     /// Ordered sections ready for display.
     var sections: [Section] {
         var result: [Section] = []
