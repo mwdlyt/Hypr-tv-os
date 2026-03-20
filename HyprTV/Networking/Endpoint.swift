@@ -11,6 +11,7 @@ enum Endpoint {
     case item(userId: String, itemId: String)
     case seasons(userId: String, seriesId: String)
     case episodes(userId: String, seriesId: String, seasonId: String)
+    case nextEpisode(userId: String, seriesId: String, currentEpisodeIndex: Int, seasonId: String)
     case playbackInfo(userId: String, itemId: String)
     case reportPlaybackStart
     case reportPlaybackProgress
@@ -36,6 +37,8 @@ enum Endpoint {
         case .seasons(_, let seriesId):
             return "/Shows/\(seriesId)/Seasons"
         case .episodes(_, let seriesId, _):
+            return "/Shows/\(seriesId)/Episodes"
+        case .nextEpisode(_, let seriesId, _, _):
             return "/Shows/\(seriesId)/Episodes"
         case .playbackInfo(_, let itemId):
             return "/Items/\(itemId)/PlaybackInfo"
@@ -107,6 +110,15 @@ enum Endpoint {
                 URLQueryItem(name: "UserId", value: userId),
                 URLQueryItem(name: "SeasonId", value: seasonId),
                 URLQueryItem(name: "Fields", value: "Overview,MediaSources,MediaStreams,UserData,PrimaryImageAspectRatio")
+            ]
+
+        case .nextEpisode(let userId, _, let currentIndex, let seasonId):
+            return [
+                URLQueryItem(name: "UserId", value: userId),
+                URLQueryItem(name: "SeasonId", value: seasonId),
+                URLQueryItem(name: "StartIndex", value: "\(currentIndex)"),
+                URLQueryItem(name: "Limit", value: "2"),
+                URLQueryItem(name: "Fields", value: "Overview,UserData,PrimaryImageAspectRatio")
             ]
 
         case .playbackInfo(let userId, _):

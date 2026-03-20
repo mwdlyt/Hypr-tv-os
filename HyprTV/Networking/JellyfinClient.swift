@@ -265,6 +265,19 @@ final class JellyfinClient {
         return response.items
     }
 
+    /// Fetches the next episode after the given episode index in a season.
+    func getNextEpisode(seriesId: String, seasonId: String, currentEpisodeIndex: Int) async throws -> MediaItemDTO? {
+        guard let userId else { throw JellyfinError.notAuthenticated }
+        let response: ItemsResponse = try await request(.nextEpisode(
+            userId: userId,
+            seriesId: seriesId,
+            currentEpisodeIndex: currentEpisodeIndex,
+            seasonId: seasonId
+        ))
+        // The API returns episodes starting from currentIndex. The next one is at index 1.
+        return response.items.count > 1 ? response.items[1] : nil
+    }
+
     // MARK: - Playback
 
     /// Retrieves available media sources and a play session ID for a given item.

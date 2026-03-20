@@ -24,6 +24,23 @@ final class PlayerViewModel {
     var playSessionId: String?
     var error: String?
 
+    // MARK: - Up Next (Netflix-style)
+
+    /// The next episode to play, if available.
+    var nextEpisode: MediaItemDTO?
+    /// Whether the Up Next overlay is visible.
+    var showUpNext: Bool = false
+    /// Countdown seconds until auto-play (starts at 30).
+    var upNextCountdown: Int = 30
+    /// Whether the user dismissed the Up Next card (episode still finishes, then auto-plays).
+    var upNextDismissed: Bool = false
+    /// Threshold in ticks before end to trigger Up Next (90 seconds).
+    private static let upNextThresholdTicks: Int64 = 90 * 10_000_000
+    /// Whether Up Next has already been triggered for this playback.
+    private var upNextTriggered: Bool = false
+    /// Countdown timer task.
+    private var countdownTask: Task<Void, Never>?
+
     // MARK: - Computed Properties
 
     /// Playback progress as a value from 0.0 to 1.0.
@@ -181,6 +198,86 @@ final class PlayerViewModel {
     func resetOverlayTimer() {
         guard showOverlay else { return }
         scheduleOverlayHide()
+    }
+
+    // MARK: - Up Next Logic
+
+    /// Call this from the current item's metadata to pre-fetch the next episode.
+    func loadNextEpisode(currentItem: MediaItemDTO) async {
+        guard currentItem.type == .episode,
+              let seriesId = currentItem.seriesId,
+              let seasonId = currentItem.seasonId,
+              let episodeIndex = currentItem.indexNumber else { return }
+
+        do {
+            nextEpisode = try await client.getNextEpisode(
+                seriesId: seriesId,
+                seasonId: seasonId,
+                currentEpisodeIndex: episodeIndex - 1 // API is 0-indexed, Jellyfin episodes are 1-indexed
+            )
+        } catch {
+            nextEpisode = nil
+        }
+    }
+
+    /// Called every time playback position updates. Checks if we're in the
+    /// "Up Next" zone (last 90 seconds of an episode).
+    func checkUpNextTrigger() {
+        guard nextEpisode != nil,
+              !upNextTriggered,
+              duration > 0,
+              duration - currentTime <= Self.upNextThresholdTicks,
+              duration - currentTime > 0 else { return }
+
+        upNextTriggered = true
+        showUpNext = true
+        upNextCountdown = 30
+        startCountdown()
+    }
+
+    /// User taps "Play Now" — immediately jump to next episode.
+    func playNextNow() {
+        countdownTask?.cancel()
+        showUpNext = false
+        // The view layer should observe this and load the next episode
+    }
+
+    /// User taps "Cancel" — dismiss the overlay, let current episode finish,
+    /// then auto-advance when it ends.
+    func dismissUpNext() {
+        countdownTask?.cancel()
+        showUpNext = false
+        upNextDismissed = true
+    }
+
+    /// Called when the current episode finishes (progress reaches end).
+    /// Returns true if we should auto-advance to next episode.
+    var shouldAutoPlayNext: Bool {
+        nextEpisode != nil
+    }
+
+    /// Resets Up Next state for a new episode.
+    func resetUpNextState() {
+        countdownTask?.cancel()
+        showUpNext = false
+        upNextDismissed = false
+        upNextTriggered = false
+        upNextCountdown = 30
+        nextEpisode = nil
+    }
+
+    private func startCountdown() {
+        countdownTask?.cancel()
+        countdownTask = Task { [weak self] in
+            while let self, self.upNextCountdown > 0, !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled else { return }
+                self.upNextCountdown -= 1
+            }
+            guard !Task.isCancelled else { return }
+            // Countdown hit 0 — auto-play next
+            self?.playNextNow()
+        }
     }
 
     // MARK: - Private Helpers
