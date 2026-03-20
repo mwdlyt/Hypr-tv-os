@@ -37,6 +37,16 @@ final class SearchViewModel {
     private var currentStartIndex: Int = 0
     private var hasMoreResults: Bool = false
 
+    // MARK: - Parental Controls
+
+    /// The maximum official rating string derived from the user's parental policy.
+    private var maxOfficialRating: String? {
+        guard let policy = client.userPolicy,
+              let maxRating = policy.maxParentalRating, maxRating > 0 else { return nil }
+        let sorted = UserPolicy.ratingValues.sorted { $0.value < $1.value }
+        return sorted.last(where: { $0.value <= maxRating })?.key
+    }
+
     // MARK: - Debounce
 
     private var debounceTask: Task<Void, Never>?
@@ -68,7 +78,7 @@ final class SearchViewModel {
         error = nil
 
         do {
-            let response = try await client.search(query: trimmed, startIndex: 0, limit: pageSize)
+            let response = try await client.search(query: trimmed, startIndex: 0, limit: pageSize, maxOfficialRating: maxOfficialRating)
             results = response.items
             totalCount = response.totalRecordCount
             currentStartIndex = response.items.count
@@ -92,7 +102,7 @@ final class SearchViewModel {
         isLoadingMore = true
 
         do {
-            let response = try await client.search(query: trimmed, startIndex: currentStartIndex, limit: pageSize)
+            let response = try await client.search(query: trimmed, startIndex: currentStartIndex, limit: pageSize, maxOfficialRating: maxOfficialRating)
             results.append(contentsOf: response.items)
             totalCount = response.totalRecordCount
             currentStartIndex += response.items.count

@@ -49,6 +49,14 @@ final class LibraryViewModel {
 
     // MARK: - Data Loading
 
+    /// The maximum official rating string derived from the user's parental policy.
+    private var maxOfficialRating: String? {
+        guard let policy = client.userPolicy,
+              let maxRating = policy.maxParentalRating, maxRating > 0 else { return nil }
+        let sorted = UserPolicy.ratingValues.sorted { $0.value < $1.value }
+        return sorted.last(where: { $0.value <= maxRating })?.key
+    }
+
     /// Loads the first page of items, resetting any existing state.
     func loadItems() async {
         resetPagination()
@@ -61,7 +69,8 @@ final class LibraryViewModel {
                 startIndex: 0,
                 limit: pageSize,
                 sortBy: sortBy,
-                sortOrder: sortOrder
+                sortOrder: sortOrder,
+                maxOfficialRating: maxOfficialRating
             )
 
             items = response.items
@@ -90,7 +99,8 @@ final class LibraryViewModel {
                 startIndex: currentStartIndex,
                 limit: pageSize,
                 sortBy: sortBy,
-                sortOrder: sortOrder
+                sortOrder: sortOrder,
+                maxOfficialRating: maxOfficialRating
             )
 
             items.append(contentsOf: response.items)
@@ -163,7 +173,8 @@ final class LibraryViewModel {
                     startIndex: self.currentStartIndex,
                     limit: 1, // Tiny request just to warm the connection
                     sortBy: self.sortBy,
-                    sortOrder: self.sortOrder
+                    sortOrder: self.sortOrder,
+                    maxOfficialRating: self.maxOfficialRating
                 )
             } catch {
                 // Prefetch failures are non-fatal.

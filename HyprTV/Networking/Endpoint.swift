@@ -3,11 +3,14 @@ import Foundation
 /// Enum-based endpoint builder that maps every Jellyfin REST call to its path, HTTP method, and query parameters.
 enum Endpoint {
     case publicServerInfo
+    case publicUsers
     case authenticateByName
+    case currentUser(userId: String)
     case userViews(userId: String)
     case latestItems(userId: String, parentId: String?, limit: Int)
     case items(userId: String, parentId: String?, startIndex: Int, limit: Int,
-               sortBy: String?, sortOrder: String?, includeItemTypes: String?, recursive: Bool)
+               sortBy: String?, sortOrder: String?, includeItemTypes: String?, recursive: Bool,
+               maxOfficialRating: String?)
     case item(userId: String, itemId: String)
     case seasons(userId: String, seriesId: String)
     case episodes(userId: String, seriesId: String, seasonId: String)
@@ -16,7 +19,7 @@ enum Endpoint {
     case reportPlaybackStart
     case reportPlaybackProgress
     case reportPlaybackStopped
-    case search(userId: String, searchTerm: String, startIndex: Int, limit: Int)
+    case search(userId: String, searchTerm: String, startIndex: Int, limit: Int, maxOfficialRating: String?)
     case resumeItems(userId: String, limit: Int)
 
     /// The URL path component (without base URL or query string).
@@ -24,13 +27,15 @@ enum Endpoint {
         switch self {
         case .publicServerInfo:
             return "/System/Info/Public"
+        case .publicUsers:
+            return "/Users/Public"
         case .authenticateByName:
             return "/Users/AuthenticateByName"
         case .userViews(let userId):
             return "/Users/\(userId)/Views"
         case .latestItems(let userId, _, _):
             return "/Users/\(userId)/Items/Latest"
-        case .items(let userId, _, _, _, _, _, _, _):
+        case .items(let userId, _, _, _, _, _, _, _, _):
             return "/Users/\(userId)/Items"
         case .item(let userId, let itemId):
             return "/Users/\(userId)/Items/\(itemId)"
@@ -48,7 +53,7 @@ enum Endpoint {
             return "/Sessions/Playing/Progress"
         case .reportPlaybackStopped:
             return "/Sessions/Playing/Stopped"
-        case .search(let userId, _, _, _):
+        case .search(let userId, _, _, _, _):
             return "/Users/\(userId)/Items"
         case .resumeItems(let userId, _):
             return "/Users/\(userId)/Items/Resume"
@@ -72,7 +77,7 @@ enum Endpoint {
     /// Query parameters specific to this endpoint.
     private var queryItems: [URLQueryItem] {
         switch self {
-        case .publicServerInfo, .authenticateByName,
+        case .publicServerInfo, .publicUsers, .authenticateByName,
              .userViews, .item,
              .reportPlaybackStart, .reportPlaybackProgress, .reportPlaybackStopped:
             return []
@@ -86,7 +91,7 @@ enum Endpoint {
             return items
 
         case .items(_, let parentId, let startIndex, let limit,
-                    let sortBy, let sortOrder, let includeItemTypes, let recursive):
+                    let sortBy, let sortOrder, let includeItemTypes, let recursive, let maxOfficialRating):
             var items: [URLQueryItem] = [
                 URLQueryItem(name: "StartIndex", value: "\(startIndex)"),
                 URLQueryItem(name: "Limit", value: "\(limit)"),
@@ -97,6 +102,7 @@ enum Endpoint {
             if let sortBy { items.append(URLQueryItem(name: "SortBy", value: sortBy)) }
             if let sortOrder { items.append(URLQueryItem(name: "SortOrder", value: sortOrder)) }
             if let includeItemTypes { items.append(URLQueryItem(name: "IncludeItemTypes", value: includeItemTypes)) }
+            if let maxOfficialRating { items.append(URLQueryItem(name: "MaxOfficialRating", value: maxOfficialRating)) }
             return items
 
         case .seasons(let userId, _):
@@ -126,8 +132,8 @@ enum Endpoint {
                 URLQueryItem(name: "UserId", value: userId)
             ]
 
-        case .search(_, let searchTerm, let startIndex, let limit):
-            return [
+        case .search(_, let searchTerm, let startIndex, let limit, let maxOfficialRating):
+            var items = [
                 URLQueryItem(name: "SearchTerm", value: searchTerm),
                 URLQueryItem(name: "StartIndex", value: "\(startIndex)"),
                 URLQueryItem(name: "Limit", value: "\(limit)"),
@@ -135,6 +141,8 @@ enum Endpoint {
                 URLQueryItem(name: "IncludeItemTypes", value: "Movie,Series,Episode"),
                 URLQueryItem(name: "Fields", value: "Overview,UserData,PrimaryImageAspectRatio")
             ]
+            if let maxOfficialRating { items.append(URLQueryItem(name: "MaxOfficialRating", value: maxOfficialRating)) }
+            return items
 
         case .resumeItems(_, let limit):
             return [

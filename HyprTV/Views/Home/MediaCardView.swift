@@ -62,6 +62,16 @@ struct MediaCardView: View {
 
                     if isFocused {
                         HStack(spacing: 6) {
+                            // Content rating badge
+                            if let officialRating = item.officialRating, !officialRating.isEmpty {
+                                Text(officialRating)
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .background(ratingBadgeColor(for: officialRating), in: RoundedRectangle(cornerRadius: 3))
+                            }
+
                             if let year = item.productionYear {
                                 Text(String(year))
                                     .font(.caption2)
@@ -111,6 +121,21 @@ struct MediaCardView: View {
             return seriesName
         }
         return item.name
+    }
+
+    private func ratingBadgeColor(for rating: String) -> Color {
+        switch rating {
+        case "G", "TV-Y", "TV-Y7", "TV-G":
+            return .green.opacity(0.8)
+        case "PG", "TV-PG":
+            return .blue.opacity(0.8)
+        case "PG-13", "TV-14":
+            return .orange.opacity(0.8)
+        case "R", "TV-MA", "NC-17":
+            return .red.opacity(0.8)
+        default:
+            return .gray.opacity(0.8)
+        }
     }
 
     private var posterURL: URL? {

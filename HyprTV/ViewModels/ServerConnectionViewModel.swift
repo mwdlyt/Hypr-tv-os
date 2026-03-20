@@ -3,7 +3,7 @@ import Foundation
 // MARK: - ServerConnectionViewModel
 
 /// Manages the full server connection lifecycle: discovery, URL validation,
-/// server handshake, and user authentication against a Jellyfin instance.
+/// server handshake, profile selection, and user authentication against a Jellyfin instance.
 @Observable
 final class ServerConnectionViewModel {
 
@@ -12,6 +12,7 @@ final class ServerConnectionViewModel {
     enum ConnectionState: Equatable {
         case disconnected
         case connected
+        case profileSelection
         case authenticated
     }
 
@@ -26,16 +27,22 @@ final class ServerConnectionViewModel {
     var serverInfo: ServerInfo?
     var connectionState: ConnectionState = .disconnected
 
+    /// Saved servers for multi-server support.
+    var savedServers: [SavedServer] = []
+
     /// Servers found via UDP broadcast on the local network.
     var discoveredServers: [ServerDiscovery.DiscoveredServer] {
         serverDiscovery.discoveredServers
     }
 
+    /// View model for the profile picker screen.
+    var profileViewModel: UserProfileViewModel?
+
     // MARK: - Dependencies
 
     private let client: JellyfinClient
     private let serverDiscovery: ServerDiscovery
-    private let authService: AuthService
+    let authService: AuthService
 
     // MARK: - Init
 
@@ -43,6 +50,7 @@ final class ServerConnectionViewModel {
         self.client = client
         self.serverDiscovery = serverDiscovery
         self.authService = authService
+        self.savedServers = ServerStore.getServers()
     }
 
     // MARK: - Discovery
@@ -62,9 +70,29 @@ final class ServerConnectionViewModel {
         serverURL = server.address
     }
 
+    // MARK: - Saved Servers
+
+    /// Reloads the list of saved servers from persistent storage.
+    func refreshSavedServers() {
+        savedServers = ServerStore.getServers()
+    }
+
+    /// Connects to a previously saved server.
+    func connectToSavedServer(_ server: SavedServer) async {
+        serverURL = server.url
+        await connectToServer()
+    }
+
+    /// Removes a saved server.
+    func removeSavedServer(_ server: SavedServer) {
+        ServerStore.removeServer(id: server.id)
+        refreshSavedServers()
+    }
+
     // MARK: - Connection
 
     /// Validates the URL, connects to the Jellyfin server, and retrieves public server info.
+    /// After successful connection, transitions to profile selection.
     func connectToServer() async {
         let trimmed = serverURL.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -85,19 +113,31 @@ final class ServerConnectionViewModel {
         do {
             let info = try await client.connectToServer(url: url)
             serverInfo = info
-            connectionState = .connected
+            connectionState = .profileSelection
             UserDefaultsStore.set(url.absoluteString, for: .lastServerURL)
+
+            // Save this server for multi-server support
+            let savedServer = SavedServer(
+                name: info.serverName,
+                url: url.absoluteString
+            )
+            ServerStore.saveServer(savedServer)
+            refreshSavedServers()
+
+            // Create profile view model for the profile picker
+            profileViewModel = UserProfileViewModel(client: client, authService: authService)
         } catch {
             self.error = "Could not reach server: \(error.localizedDescription)"
             connectionState = .disconnected
         }
     }
 
-    // MARK: - Authentication
+    // MARK: - Authentication (Manual Login Fallback)
 
     /// Authenticates the user with the connected Jellyfin server.
+    /// Used as a fallback when there are no public users or when manual login is needed.
     func login() async {
-        guard connectionState == .connected else {
+        guard connectionState == .connected || connectionState == .profileSelection else {
             error = "Connect to a server before logging in."
             return
         }
@@ -115,9 +155,23 @@ final class ServerConnectionViewModel {
         do {
             try await authService.login(username: trimmedUser, password: password)
             connectionState = .authenticated
+            // Touch the server in saved servers to update lastUsed
+            if let url = client.baseURL?.absoluteString {
+                ServerStore.touchServer(url: url)
+            }
         } catch {
             self.error = "Authentication failed: \(error.localizedDescription)"
         }
+    }
+
+    /// Navigates back to the disconnected state for server selection.
+    func goBackToServerSelection() {
+        connectionState = .disconnected
+        error = nil
+        serverInfo = nil
+        profileViewModel = nil
+        username = ""
+        password = ""
     }
 
     /// Attempts to restore a previously authenticated session from the keychain.
@@ -139,9 +193,11 @@ final class ServerConnectionViewModel {
             try await authService.restoreSession()
             connectionState = .authenticated
         } catch {
-            // Session restoration is best-effort; drop back to disconnected state
-            // so the user sees the login screen rather than a cryptic error.
-            connectionState = serverInfo != nil ? .connected : .disconnected
+            // Session restoration is best-effort; drop back to appropriate state
+            connectionState = serverInfo != nil ? .profileSelection : .disconnected
+            if serverInfo != nil {
+                profileViewModel = UserProfileViewModel(client: client, authService: authService)
+            }
         }
 
         isConnecting = false

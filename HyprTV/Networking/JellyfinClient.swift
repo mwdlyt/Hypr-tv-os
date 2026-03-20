@@ -54,6 +54,8 @@ final class JellyfinClient {
     var accessToken: String?
     /// Authenticated user's identifier.
     var userId: String?
+    /// The authenticated user's policy for parental controls.
+    var userPolicy: UserPolicy?
 
     /// Convenience check for whether the client holds valid credentials.
     var isAuthenticated: Bool {
@@ -186,6 +188,13 @@ final class JellyfinClient {
         return info
     }
 
+    // MARK: - Public Users
+
+    /// Fetches the list of public users from the connected server (no auth required).
+    func fetchPublicUsers() async throws -> [UserDTO] {
+        return try await request(.publicUsers)
+    }
+
     // MARK: - Authentication
 
     /// Authenticates with username and password. Stores the resulting token and user ID.
@@ -228,7 +237,8 @@ final class JellyfinClient {
         sortBy: String? = nil,
         sortOrder: String? = nil,
         includeItemTypes: String? = nil,
-        recursive: Bool = true
+        recursive: Bool = true,
+        maxOfficialRating: String? = nil
     ) async throws -> ItemsResponse {
         guard let userId else { throw JellyfinError.notAuthenticated }
         return try await request(.items(
@@ -239,7 +249,8 @@ final class JellyfinClient {
             sortBy: sortBy,
             sortOrder: sortOrder,
             includeItemTypes: includeItemTypes,
-            recursive: recursive
+            recursive: recursive,
+            maxOfficialRating: maxOfficialRating
         ))
     }
 
@@ -324,9 +335,9 @@ final class JellyfinClient {
 
     /// Searches for movies, series, and episodes matching the given query string.
     /// Returns a full `ItemsResponse` so callers can paginate through large result sets.
-    func search(query: String, startIndex: Int = 0, limit: Int = 50) async throws -> ItemsResponse {
+    func search(query: String, startIndex: Int = 0, limit: Int = 50, maxOfficialRating: String? = nil) async throws -> ItemsResponse {
         guard let userId else { throw JellyfinError.notAuthenticated }
-        return try await request(.search(userId: userId, searchTerm: query, startIndex: startIndex, limit: limit))
+        return try await request(.search(userId: userId, searchTerm: query, startIndex: startIndex, limit: limit, maxOfficialRating: maxOfficialRating))
     }
 
     // MARK: - Resume
@@ -365,6 +376,20 @@ final class JellyfinClient {
         return components?.url
     }
 
+    /// Constructs a user profile image URL.
+    func userImageURL(userId: String, tag: String? = nil, maxWidth: Int = 200) -> URL? {
+        guard let baseURL else { return nil }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/Users/\(userId)/Images/Primary"), resolvingAgainstBaseURL: false)
+        var queryItems: [URLQueryItem] = [
+            URLQueryItem(name: "maxWidth", value: "\(maxWidth)")
+        ]
+        if let tag {
+            queryItems.append(URLQueryItem(name: "tag", value: tag))
+        }
+        components?.queryItems = queryItems
+        return components?.url
+    }
+
     /// Constructs a direct stream URL for playback with authentication baked in.
     ///
     /// The returned URL can be handed directly to AVPlayer or VLC. The access token is
@@ -400,6 +425,7 @@ final class JellyfinClient {
         self.baseURL = nil
         self.accessToken = nil
         self.userId = nil
+        self.userPolicy = nil
     }
 }
 

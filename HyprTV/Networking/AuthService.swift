@@ -15,6 +15,18 @@ final class AuthService {
     /// The currently authenticated user, or nil if not logged in.
     var currentUser: UserDTO?
 
+    /// The authenticated user's policy for parental controls. Populated after login.
+    var userPolicy: UserPolicy?
+
+    /// The maximum official rating string derived from the user's policy.
+    /// Used to filter content in API queries. Nil means no restriction.
+    var maxOfficialRating: String? {
+        guard let maxRating = userPolicy?.maxParentalRating, maxRating > 0 else { return nil }
+        // Find the highest rating string that maps to this numeric value
+        let sorted = UserPolicy.ratingValues.sorted { $0.value < $1.value }
+        return sorted.last(where: { $0.value <= maxRating })?.key
+    }
+
     /// Convenience accessor for authentication status.
     var isLoggedIn: Bool { currentUser != nil && client.isAuthenticated }
 
@@ -61,6 +73,8 @@ final class AuthService {
         try KeychainService.save(response.user.id, for: .userId)
 
         currentUser = response.user
+        userPolicy = response.user.policy
+        client.userPolicy = response.user.policy
     }
 
     // MARK: - Logout
@@ -70,6 +84,7 @@ final class AuthService {
         KeychainService.deleteAll()
         client.clearSession()
         currentUser = nil
+        userPolicy = nil
     }
 
     // MARK: - Session Restoration

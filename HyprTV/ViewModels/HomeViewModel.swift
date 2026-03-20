@@ -119,7 +119,8 @@ final class HomeViewModel {
 
     private func loadResumeItems() async {
         do {
-            resumeItems = try await client.getResumeItems()
+            let items = try await client.getResumeItems()
+            resumeItems = filterByParentalRating(items)
         } catch {
             // Non-fatal: the "Continue Watching" row simply won't appear.
             resumeItems = []
@@ -129,10 +130,19 @@ final class HomeViewModel {
     private func loadLatestItems(for library: LibraryDTO) async {
         do {
             let items = try await client.getLatestItems(parentId: library.id)
-            latestItemsByLibrary[library.id] = items
+            latestItemsByLibrary[library.id] = filterByParentalRating(items)
         } catch {
             // Non-fatal: the section for this library simply won't appear.
             latestItemsByLibrary[library.id] = []
         }
+    }
+
+    /// Filters items client-side based on the user's parental rating policy.
+    /// This is a safety layer on top of server-side filtering.
+    private func filterByParentalRating(_ items: [MediaItemDTO]) -> [MediaItemDTO] {
+        guard let policy = client.userPolicy, policy.maxParentalRating != nil else {
+            return items
+        }
+        return items.filter { policy.isRatingAllowed($0.officialRating) }
     }
 }

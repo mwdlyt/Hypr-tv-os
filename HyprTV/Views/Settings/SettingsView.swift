@@ -18,6 +18,33 @@ struct SettingsView: View {
                 Text("Media")
             }
 
+            // Parental controls info (if restrictions are active)
+            if let policy = jellyfinClient.userPolicy, policy.maxParentalRating != nil {
+                Section {
+                    LabeledContent("Content Restriction") {
+                        if let maxRating = policy.maxParentalRating {
+                            let ratingName = UserPolicy.ratingValues
+                                .sorted { $0.value < $1.value }
+                                .last(where: { $0.value <= maxRating })?.key ?? "Level \(maxRating)"
+                            Text("Max: \(ratingName)")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    if let blockedTags = policy.blockedTags, !blockedTags.isEmpty {
+                        LabeledContent("Blocked Tags") {
+                            Text(blockedTags.joined(separator: ", "))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                        }
+                    }
+                } header: {
+                    Text("Parental Controls")
+                } footer: {
+                    Text("Content restrictions are managed by your server administrator.")
+                }
+            }
+
             Section {
                 if let serverURL = jellyfinClient.baseURL {
                     LabeledContent("Server") {
@@ -40,9 +67,16 @@ struct SettingsView: View {
             }
 
             Section {
-                Button("Sign Out", role: .destructive) {
+                Button("Switch Server") {
                     jellyfinClient.clearSession()
                 }
+
+                Button("Sign Out", role: .destructive) {
+                    jellyfinClient.clearSession()
+                    KeychainService.deleteAll()
+                }
+            } header: {
+                Text("Account")
             }
         }
         .navigationTitle("Settings")
