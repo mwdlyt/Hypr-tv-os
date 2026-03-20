@@ -10,6 +10,9 @@ enum UserDefaultsStore {
         case preferredAudioLanguage
         case preferredSubtitleLanguage
         case subtitlesEnabled
+        case audioOutputMode
+        case audioBoostEnabled
+        case audioBoostLevel
     }
 
     // MARK: - String

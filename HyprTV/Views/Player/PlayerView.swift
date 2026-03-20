@@ -7,6 +7,7 @@ struct PlayerView: View {
     let itemId: String
 
     @Environment(JellyfinClient.self) private var jellyfinClient
+    @Environment(AudioSettings.self) private var audioSettings
     @State private var viewModel: PlayerViewModel?
     @State private var playerWrapper = VLCPlayerWrapper()
 
@@ -38,6 +39,7 @@ struct PlayerView: View {
                 viewModel = vm
                 do {
                     let streamURL = try await vm.loadPlaybackInfo()
+                    playerWrapper.audioSettings = audioSettings
                     playerWrapper.playURL(streamURL)
                     await vm.reportStart()
                 } catch {

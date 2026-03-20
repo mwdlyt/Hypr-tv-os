@@ -11,6 +11,7 @@ final class AppRouter {
         case mediaDetail(itemId: String)
         case player(itemId: String)
         case search
+        case settings
     }
 
     // MARK: - State

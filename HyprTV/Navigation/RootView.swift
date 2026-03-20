@@ -23,6 +23,8 @@ struct RootView: View {
                                 PlayerView(itemId: itemId)
                             case .search:
                                 SearchView()
+                            case .settings:
+                                SettingsView()
                             }
                         }
                 }

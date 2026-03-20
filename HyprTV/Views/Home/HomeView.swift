@@ -12,6 +12,7 @@ struct HomeView: View {
     enum HomeTab: Hashable {
         case home
         case search
+        case settings
     }
 
     var body: some View {
@@ -27,6 +28,14 @@ struct HomeView: View {
                     Label("Search", systemImage: "magnifyingglass")
                 }
                 .tag(HomeTab.search)
+
+            NavigationStack {
+                SettingsView()
+            }
+            .tabItem {
+                Label("Settings", systemImage: "gearshape.fill")
+            }
+            .tag(HomeTab.settings)
         }
     }
 

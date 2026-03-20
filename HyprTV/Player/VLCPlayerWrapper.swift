@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import AVFoundation
 import MobileVLCKit
 import os
 
@@ -57,6 +58,9 @@ final class VLCPlayerWrapper: NSObject {
     /// Guards against re-entrant setup calls.
     private var isSetUp = false
 
+    /// Audio settings used for downmixing and format configuration.
+    var audioSettings: AudioSettings?
+
     private let logger = Logger.player
 
     // MARK: - Lifecycle
@@ -106,10 +110,62 @@ final class VLCPlayerWrapper: NSObject {
 
         let media = VLCMedia(url: url)
 
-        // Network caching for smoother streaming over LAN/WAN.
-        media?.addOptions([
-            "network-caching": 1500
-        ])
+        // Build comprehensive media options
+        var options: [String: Any] = [:]
+
+        // --- Network ---
+        options["network-caching"] = 1500
+
+        // --- Hardware-accelerated decoding ---
+        options["--codec"] = "avcodec"
+        options["--avcodec-hw"] = "any"
+
+        // --- Video codecs: H.264, HEVC, VP9, AV1, MPEG-2, VC-1 ---
+        options["--avcodec-skiploopfilter"] = 0  // full quality decoding
+
+        // --- HDR passthrough ---
+        options["--video-color-space"] = "auto"
+        options["--video-transfer-function"] = "auto"
+
+        // --- Subtitle rendering (SRT, ASS/SSA, PGS, DVDSUB, VobSub) ---
+        options["--sub-autodetect-file"] = ""
+        options["--sub-text-scale"] = 100
+        options["--freetype-font"] = "Helvetica Neue"
+        options["--freetype-fontsize"] = 24
+        options["--freetype-color"] = 16777215  // white
+        options["--freetype-rel-fontsize"] = 20
+        options["--subsdec-encoding"] = "UTF-8"
+
+        // --- Container / demuxer hints (MKV, MP4, AVI, MOV, WMV, FLV, TS, M2TS, ISO/BDMV) ---
+        options["--adaptive-logic"] = "default"
+        options["--live-caching"] = 1500
+        options["--disc-caching"] = 1500
+
+        // --- Audio codec support (DTS, DTS-HD MA, DTS-X, Dolby Digital/DD+, TrueHD, AAC, FLAC, PCM, MP3, Opus, Vorbis) ---
+        options["--audio-desync"] = 0
+        options["--audio-resampler"] = "soxr"
+
+        // --- Audio downmixing from AudioSettings ---
+        if let audioSettings {
+            let audioOpts = audioSettings.vlcAudioOptions()
+            for (key, value) in audioOpts {
+                options[key] = value
+            }
+
+            // Preferred audio language
+            if !audioSettings.preferredAudioLanguage.isEmpty {
+                options["--audio-language"] = audioSettings.preferredAudioLanguage
+            }
+
+            // Preferred subtitle language
+            if audioSettings.preferredSubtitleLanguage != "off" {
+                options["--sub-language"] = audioSettings.preferredSubtitleLanguage
+            }
+
+            logger.info("VLCPlayerWrapper: audio mode = \(audioSettings.effectiveOutputMode.displayName)")
+        }
+
+        media?.addOptions(options)
 
         player.media = media
         player.play()
