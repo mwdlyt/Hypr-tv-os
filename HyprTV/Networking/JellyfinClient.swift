@@ -337,6 +337,35 @@ final class JellyfinClient {
         try await requestIgnoringResponse(.reportPlaybackStopped, body: data)
     }
 
+    // MARK: - Media Segments
+
+    /// Fetches media segments (intro, outro, recap, preview) for a given item.
+    func getMediaSegments(itemId: String) async throws -> [MediaSegment] {
+        let response: MediaSegmentsResponse = try await request(.mediaSegments(itemId: itemId))
+        return response.items
+    }
+
+    // MARK: - Subtitle URLs
+
+    /// Constructs a URL for an external subtitle stream.
+    ///
+    /// - Parameters:
+    ///   - itemId: The media item identifier.
+    ///   - mediaSourceId: The media source identifier.
+    ///   - streamIndex: The subtitle stream index.
+    ///   - format: The subtitle format (e.g. "srt", "ass", "vtt").
+    /// - Returns: A fully qualified subtitle URL with authentication, or nil if base URL is not set.
+    func subtitleURL(itemId: String, mediaSourceId: String, streamIndex: Int, format: String) -> URL? {
+        guard let baseURL, let token = accessToken else { return nil }
+
+        let path = "/Videos/\(itemId)/\(mediaSourceId)/Subtitles/\(streamIndex)/Stream.\(format)"
+        var components = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false)
+        components?.queryItems = [
+            URLQueryItem(name: "api_key", value: token)
+        ]
+        return components?.url
+    }
+
     // MARK: - Search
 
     /// Searches for movies, series, and episodes matching the given query string.

@@ -24,6 +24,23 @@ final class PlayerViewModel {
     var playSessionId: String?
     var error: String?
 
+    // MARK: - Media Segments (Skip Intro/Outro/Recap)
+
+    /// All segments for the current item.
+    var segments: [MediaSegment] = []
+
+    /// The segment the playback position is currently within, if any.
+    var currentSegment: MediaSegment? {
+        segments.first { segment in
+            currentTime >= segment.startTicks && currentTime < segment.endTicks
+        }
+    }
+
+    // MARK: - External Subtitles
+
+    /// External subtitle streams that need to be loaded via URL.
+    var externalSubtitleStreams: [MediaStreamDTO] = []
+
     // MARK: - Up Next (Netflix-style)
 
     /// The next episode to play, if available.
@@ -101,6 +118,9 @@ final class PlayerViewModel {
         mediaSourceId = source.id
         populateTracks(from: source)
 
+        // Collect external subtitle streams
+        externalSubtitleStreams = subtitleTracks.filter { $0.isExternal == true }
+
         guard let streamURL = client.streamURL(
             itemId: itemId,
             mediaSourceId: source.id
@@ -109,6 +129,38 @@ final class PlayerViewModel {
         }
 
         return streamURL
+    }
+
+    /// Returns URLs for all external subtitle streams from Jellyfin.
+    func externalSubtitleURLs() -> [(stream: MediaStreamDTO, url: URL)] {
+        guard let mediaSourceId else { return [] }
+        return externalSubtitleStreams.compactMap { stream in
+            let format = stream.codec ?? "srt"
+            guard let url = client.subtitleURL(
+                itemId: itemId,
+                mediaSourceId: mediaSourceId,
+                streamIndex: stream.index,
+                format: format
+            ) else { return nil }
+            return (stream: stream, url: url)
+        }
+    }
+
+    /// Loads media segments (intro/outro/recap/preview) from the server.
+    func loadSegments() async {
+        do {
+            segments = try await client.getMediaSegments(itemId: itemId)
+        } catch {
+            // Non-fatal: segments are optional
+            segments = []
+        }
+    }
+
+    /// Checks if the current playback position is within a segment.
+    /// Call this on every time update.
+    func checkSegmentOverlay() {
+        // currentSegment is a computed property, so it auto-updates
+        // The view layer reads currentSegment to decide whether to show SkipButton
     }
 
     // MARK: - Playback Reporting

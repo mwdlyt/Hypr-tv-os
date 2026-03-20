@@ -230,6 +230,30 @@ final class VLCPlayerWrapper: NSObject {
         logger.debug("VLCPlayerWrapper: subtitle track set to \(index)")
     }
 
+    /// Loads an external subtitle file from a local file URL (e.g. downloaded from OpenSubtitles).
+    func loadExternalSubtitle(fileURL: URL) {
+        guard let player = mediaPlayer else { return }
+        _ = player.addPlaybackSlave(fileURL, type: .subtitle, enforce: true)
+        logger.info("VLCPlayerWrapper: loaded external subtitle from file \(fileURL.lastPathComponent, privacy: .public)")
+
+        // Refresh tracks after a short delay to pick up the new subtitle
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.refreshTracks()
+        }
+    }
+
+    /// Loads an external subtitle from a remote URL (e.g. Jellyfin external subtitle stream).
+    func loadExternalSubtitle(url: URL) {
+        guard let player = mediaPlayer else { return }
+        _ = player.addPlaybackSlave(url, type: .subtitle, enforce: false)
+        logger.info("VLCPlayerWrapper: loaded external subtitle from URL \(url.absoluteString, privacy: .public)")
+
+        // Refresh tracks after a short delay to pick up the new subtitle
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.refreshTracks()
+        }
+    }
+
     /// Stops playback and resets state. The media player is retained for reuse.
     func stop() {
         guard let player = mediaPlayer else { return }

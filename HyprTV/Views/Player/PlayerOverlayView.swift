@@ -6,6 +6,8 @@ import SwiftUI
 struct PlayerOverlayView: View {
 
     let viewModel: PlayerViewModel
+    var currentItem: MediaItemDTO?
+    var onExternalSubtitleLoaded: ((URL) -> Void)?
 
     @State private var showAudioPicker = false
     @State private var showSubtitlePicker = false
@@ -81,7 +83,12 @@ struct PlayerOverlayView: View {
             AudioTrackPickerView(viewModel: viewModel)
         }
         .sheet(isPresented: $showSubtitlePicker) {
-            SubtitlePickerView(viewModel: viewModel)
+            SubtitlePickerView(
+                viewModel: viewModel,
+                itemName: currentItem?.name ?? "",
+                imdbId: currentItem?.providerIds?["Imdb"],
+                onExternalSubtitleLoaded: onExternalSubtitleLoaded
+            )
         }
     }
 

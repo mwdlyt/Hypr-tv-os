@@ -27,6 +27,7 @@ enum Endpoint {
     case markUnplayed(userId: String, itemId: String)
     case favorite(userId: String, itemId: String)
     case unfavorite(userId: String, itemId: String)
+    case mediaSegments(itemId: String)
 
     /// The URL path component (without base URL or query string).
     var path: String {
@@ -37,6 +38,8 @@ enum Endpoint {
             return "/Users/Public"
         case .authenticateByName:
             return "/Users/AuthenticateByName"
+        case .currentUser(let userId):
+            return "/Users/\(userId)"
         case .userViews(let userId):
             return "/Users/\(userId)/Views"
         case .latestItems(let userId, _, _):
@@ -75,6 +78,8 @@ enum Endpoint {
             return "/Users/\(userId)/FavoriteItems/\(itemId)"
         case .unfavorite(let userId, let itemId):
             return "/Users/\(userId)/FavoriteItems/\(itemId)"
+        case .mediaSegments:
+            return "/MediaSegments"
         }
     }
 
@@ -101,7 +106,7 @@ enum Endpoint {
     private var queryItems: [URLQueryItem] {
         switch self {
         case .publicServerInfo, .publicUsers, .authenticateByName,
-             .userViews,
+             .currentUser, .userViews,
              .reportPlaybackStart, .reportPlaybackProgress, .reportPlaybackStopped,
              .markPlayed, .markUnplayed, .favorite, .unfavorite:
             return []
@@ -200,6 +205,11 @@ enum Endpoint {
                 items.append(URLQueryItem(name: "ParentId", value: parentId))
             }
             return items
+
+        case .mediaSegments(let itemId):
+            return [
+                URLQueryItem(name: "itemId", value: itemId)
+            ]
         }
     }
 

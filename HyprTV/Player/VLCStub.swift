@@ -57,6 +57,13 @@ import UIKit
     @objc optional func mediaPlayerTimeChanged(_ aNotification: Notification)
 }
 
+// MARK: - VLCMediaPlaybackSlaveType
+
+@objc enum VLCMediaPlaybackSlaveType: Int {
+    case subtitle = 0
+    case audio = 1
+}
+
 // MARK: - VLCMediaPlayer
 
 @objc class VLCMediaPlayer: NSObject {
@@ -86,5 +93,10 @@ import UIKit
 
     @objc func stop() {
         // no-op stub
+    }
+
+    @objc func addPlaybackSlave(_ url: URL, type: VLCMediaPlaybackSlaveType, enforce: Bool) -> Int {
+        // no-op stub
+        return 0
     }
 }
