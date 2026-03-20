@@ -189,7 +189,8 @@ struct MediaSourceDTO: Codable, Hashable {
 // MARK: - MediaStreamDTO
 
 /// A single audio, video, or subtitle stream within a media source.
-struct MediaStreamDTO: Codable, Hashable {
+struct MediaStreamDTO: Codable, Hashable, Identifiable {
+    var id: Int { index }
     /// Zero-based stream index.
     let index: Int
     /// Whether this is a video, audio, or subtitle stream.

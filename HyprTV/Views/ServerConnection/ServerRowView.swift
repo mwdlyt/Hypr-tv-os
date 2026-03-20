@@ -3,7 +3,7 @@ import SwiftUI
 /// A focusable row representing a discovered Jellyfin server on the local network.
 struct ServerRowView: View {
 
-    let server: ServerInfo
+    let server: ServerDiscovery.DiscoveredServer
     let onSelect: () -> Void
 
     @Environment(\.isFocused) private var isFocused
@@ -17,21 +17,13 @@ struct ServerRowView: View {
                     .frame(width: 44)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(server.serverName)
+                    Text(server.name)
                         .font(.headline)
                         .lineLimit(1)
 
-                    HStack(spacing: 12) {
-                        if let address = server.localAddress {
-                            Label(address, systemImage: "network")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Text("v\(server.version)")
-                            .font(.subheadline)
-                            .foregroundStyle(.tertiary)
-                    }
+                    Label(server.address, systemImage: "network")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
 
                 Spacer()
@@ -52,11 +44,10 @@ struct ServerRowView: View {
 
 #Preview {
     ServerRowView(
-        server: ServerInfo(
+        server: ServerDiscovery.DiscoveredServer(
             id: "abc",
-            serverName: "Living Room Server",
-            version: "10.8.13",
-            localAddress: "http://192.168.1.100:8096"
+            name: "Living Room Server",
+            address: "http://192.168.1.100:8096"
         )
     ) {
         print("Selected")

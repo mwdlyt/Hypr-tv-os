@@ -58,8 +58,25 @@ struct AudioSettingsView: View {
                     LabeledContent("Boost Level") {
                         Text("\(Int(audioSettings.audioBoostLevel)) dB")
                     }
-                    Slider(value: $settings.audioBoostLevel, in: 0...20, step: 1) {
-                        Text("Boost")
+                    // Slider unavailable on tvOS — use stepper-style buttons
+                    HStack {
+                        Button(action: {
+                            if audioSettings.audioBoostLevel > 0 {
+                                audioSettings.audioBoostLevel -= 1
+                            }
+                        }) {
+                            Image(systemName: "minus.circle")
+                        }
+                        Text("\(Int(audioSettings.audioBoostLevel)) dB")
+                            .monospacedDigit()
+                            .frame(minWidth: 60)
+                        Button(action: {
+                            if audioSettings.audioBoostLevel < 20 {
+                                audioSettings.audioBoostLevel += 1
+                            }
+                        }) {
+                            Image(systemName: "plus.circle")
+                        }
                     }
                 }
             } header: {

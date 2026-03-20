@@ -11,6 +11,7 @@
 		086FC0E990FDB3ABD33766DF /* AudioSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39E3DBF844C0ECC8C5E90DD1 /* AudioSettings.swift */; };
 		0B770772C3E68DDCAE51115C /* AsyncPosterImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FFB81635B2D488BB9D12D67 /* AsyncPosterImage.swift */; };
 		0CA05762439A5A43C487408D /* PlayerRepresentable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9320CCC064AF2F933E901F2A /* PlayerRepresentable.swift */; };
+		1541685E79124B98705C9D46 /* VLCStub.swift in Sources */ = {isa = PBXBuildFile; fileRef = D812B80AC8794BD6CF873B93 /* VLCStub.swift */; };
 		1B8881F0116250CE4CB87504 /* SubtitlePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 716EE53967000A30F995921E /* SubtitlePickerView.swift */; };
 		1D4FCE927E9F2ACAB9B51B2F /* VLCPlayerViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A256CC510FCF7B258DFBF70D /* VLCPlayerViewController.swift */; };
 		30D3328FF50861B995A7FFFB /* AuthResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E6B6F34244E2F5AB8663214 /* AuthResponse.swift */; };
@@ -59,7 +60,6 @@
 		E181E055B19C60403496C952 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B93C12D8C2A68137B2DE0215 /* Assets.xcassets */; };
 		E293FC29D460B9B8BE748C9B /* MediaDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81F0274BF616B185AF1601B5 /* MediaDetailView.swift */; };
 		E9D234A67544A17250E08B03 /* MediaDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DE38E68948A81861A9FDE24 /* MediaDetailViewModel.swift */; };
-		F01C05777C64FA2C652129B2 /* VLCKitSPM in Frameworks */ = {isa = PBXBuildFile; productRef = E5299347B871D56596268F65 /* VLCKitSPM */; };
 		F1827C9453B106D3EAB910A8 /* VLCPlayerWrapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 019BCE34112DD838AF9E50BA /* VLCPlayerWrapper.swift */; };
 		F76FBD6187B7F7728EBE13C9 /* TimeFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65B8821B31D9CF285F9304B3 /* TimeFormatter.swift */; };
 /* End PBXBuildFile section */
@@ -109,6 +109,7 @@
 		BEA241D1160B2109BEFD113D /* PlaybackCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackCoordinator.swift; sourceTree = "<group>"; };
 		C264FA15D32A04DC6A235B87 /* Logger+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Logger+Extensions.swift"; sourceTree = "<group>"; };
 		D1E97F0978C559D65FDBE543 /* ErrorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorView.swift; sourceTree = "<group>"; };
+		D812B80AC8794BD6CF873B93 /* VLCStub.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VLCStub.swift; sourceTree = "<group>"; };
 		D967DC50EC99364E9E25F63A /* SeasonListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeasonListView.swift; sourceTree = "<group>"; };
 		E2AC4BE3301B1CEA973D9EEA /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		E2E02F35195C3D3DEAB78D57 /* UserDefaultsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDefaultsStore.swift; sourceTree = "<group>"; };
@@ -123,17 +124,6 @@
 		F3F60DAE42030B5D58010D1C /* Constants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Constants.swift; sourceTree = "<group>"; };
 		FC417B8881237242AFE3C02C /* Endpoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Endpoint.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
-
-/* Begin PBXFrameworksBuildPhase section */
-		5C1A5ED8AA68B33B1F9EC8EE /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				F01C05777C64FA2C652129B2 /* VLCKitSPM in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		024116CD9E089F29863B1071 /* Utilities */ = {
@@ -195,6 +185,7 @@
 				9FEC0E8E60918C58536DAD81 /* RemoteCommandHandler.swift */,
 				A256CC510FCF7B258DFBF70D /* VLCPlayerViewController.swift */,
 				019BCE34112DD838AF9E50BA /* VLCPlayerWrapper.swift */,
+				D812B80AC8794BD6CF873B93 /* VLCStub.swift */,
 			);
 			path = Player;
 			sourceTree = "<group>";
@@ -377,7 +368,6 @@
 			buildPhases = (
 				6BB966DB4EA1C49271BA5679 /* Sources */,
 				193030CC2573F0F4F789D10D /* Resources */,
-				5C1A5ED8AA68B33B1F9EC8EE /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -385,7 +375,6 @@
 			);
 			name = HyprTV;
 			packageProductDependencies = (
-				E5299347B871D56596268F65 /* VLCKitSPM */,
 			);
 			productName = HyprTV;
 			productReference = B5B20B3C8D4E04A37BF9DD36 /* HyprTV.app */;
@@ -411,9 +400,6 @@
 			);
 			mainGroup = 7D13AFF4DA7B15731CA1F561;
 			minimizedProjectReferenceProxies = 1;
-			packageReferences = (
-				10BADDD0E300F7197133E85A /* XCRemoteSwiftPackageReference "vlckit-spm" */,
-			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E9C6E92C8470031FA79CAE21 /* Products */;
 			projectDirPath = "";
@@ -492,6 +478,7 @@
 				BE4D50529F8610675154B4ED /* UserDefaultsStore.swift in Sources */,
 				1D4FCE927E9F2ACAB9B51B2F /* VLCPlayerViewController.swift in Sources */,
 				F1827C9453B106D3EAB910A8 /* VLCPlayerWrapper.swift in Sources */,
+				1541685E79124B98705C9D46 /* VLCStub.swift in Sources */,
 				D0EC6F82FB644A6055858E97 /* View+TVFocus.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -682,25 +669,6 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
-
-/* Begin XCRemoteSwiftPackageReference section */
-		10BADDD0E300F7197133E85A /* XCRemoteSwiftPackageReference "vlckit-spm" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/tylerjonesio/vlckit-spm.git";
-			requirement = {
-				kind = exactVersion;
-				version = 3.6.0;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		E5299347B871D56596268F65 /* VLCKitSPM */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 10BADDD0E300F7197133E85A /* XCRemoteSwiftPackageReference "vlckit-spm" */;
-			productName = VLCKitSPM;
-		};
-/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = C9CAA2F80039B46E612A53F4 /* Project object */;
 }

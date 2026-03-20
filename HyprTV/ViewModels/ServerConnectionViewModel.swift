@@ -27,7 +27,7 @@ final class ServerConnectionViewModel {
     var connectionState: ConnectionState = .disconnected
 
     /// Servers found via UDP broadcast on the local network.
-    var discoveredServers: [ServerInfo] {
+    var discoveredServers: [ServerDiscovery.DiscoveredServer] {
         serverDiscovery.discoveredServers
     }
 
@@ -58,11 +58,8 @@ final class ServerConnectionViewModel {
     }
 
     /// Populates the server URL field from a server found via discovery.
-    func selectDiscoveredServer(_ server: ServerInfo) {
-        if let localAddress = server.localAddress {
-            serverURL = localAddress
-        }
-        serverInfo = server
+    func selectDiscoveredServer(_ server: ServerDiscovery.DiscoveredServer) {
+        serverURL = server.address
     }
 
     // MARK: - Connection

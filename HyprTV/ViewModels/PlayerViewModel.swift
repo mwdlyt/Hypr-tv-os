@@ -8,14 +8,6 @@ import Foundation
 @Observable
 final class PlayerViewModel {
 
-    // MARK: - Track Info
-
-    struct TrackInfo: Identifiable, Hashable {
-        let id: Int
-        let index: Int
-        let title: String
-    }
-
     // MARK: - Properties
 
     var isPlaying: Bool = false
@@ -24,10 +16,10 @@ final class PlayerViewModel {
     var isBuffering: Bool = false
     var showOverlay: Bool = true
 
-    var audioTracks: [TrackInfo] = []
-    var subtitleTracks: [TrackInfo] = []
-    var selectedAudioTrack: Int = -1
-    var selectedSubtitleTrack: Int = -1
+    var audioTracks: [MediaStreamDTO] = []
+    var subtitleTracks: [MediaStreamDTO] = []
+    var selectedAudioTrack: MediaStreamDTO?
+    var selectedSubtitleTrack: MediaStreamDTO?
 
     var playSessionId: String?
     var error: String?
@@ -161,14 +153,14 @@ final class PlayerViewModel {
         currentTime = max(0, min(ticks, duration))
     }
 
-    /// Selects an audio track by its stream index.
-    func selectAudioTrack(index: Int) {
-        selectedAudioTrack = index
+    /// Selects an audio track.
+    func selectAudioTrack(_ track: MediaStreamDTO?) {
+        selectedAudioTrack = track
     }
 
-    /// Selects a subtitle track by its stream index. Pass -1 to disable subtitles.
-    func selectSubtitleTrack(index: Int) {
-        selectedSubtitleTrack = index
+    /// Selects a subtitle track. Pass nil to disable subtitles.
+    func selectSubtitleTrack(_ track: MediaStreamDTO?) {
+        selectedSubtitleTrack = track
     }
 
     // MARK: - Overlay
@@ -196,39 +188,20 @@ final class PlayerViewModel {
     private func populateTracks(from source: MediaSourceDTO) {
         guard let streams = source.mediaStreams else { return }
 
-        audioTracks = streams
-            .filter { $0.type == .audio }
-            .enumerated()
-            .map { offset, stream in
-                TrackInfo(
-                    id: stream.index,
-                    index: stream.index,
-                    title: stream.displayTitle ?? stream.language ?? "Track \(offset + 1)"
-                )
-            }
-
-        subtitleTracks = streams
-            .filter { $0.type == .subtitle }
-            .enumerated()
-            .map { offset, stream in
-                TrackInfo(
-                    id: stream.index,
-                    index: stream.index,
-                    title: stream.displayTitle ?? stream.language ?? "Subtitle \(offset + 1)"
-                )
-            }
+        audioTracks = streams.filter { $0.type == .audio }
+        subtitleTracks = streams.filter { $0.type == .subtitle }
 
         // Select default tracks.
-        if let defaultAudio = streams.first(where: { $0.type == .audio && $0.isDefault == true }) {
-            selectedAudioTrack = defaultAudio.index
-        } else if let firstAudio = audioTracks.first {
-            selectedAudioTrack = firstAudio.index
+        if let defaultAudio = audioTracks.first(where: { $0.isDefault == true }) {
+            selectedAudioTrack = defaultAudio
+        } else {
+            selectedAudioTrack = audioTracks.first
         }
 
-        if let defaultSub = streams.first(where: { $0.type == .subtitle && $0.isDefault == true }) {
-            selectedSubtitleTrack = defaultSub.index
+        if let defaultSub = subtitleTracks.first(where: { $0.isDefault == true }) {
+            selectedSubtitleTrack = defaultSub
         } else {
-            selectedSubtitleTrack = -1
+            selectedSubtitleTrack = nil
         }
     }
 
