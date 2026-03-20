@@ -136,35 +136,7 @@ struct PlaybackSettingsView: View {
 // MARK: - Subtitle Settings
 
 struct SubtitleSettingsView: View {
-    @State private var apiKey: String = OpenSubtitlesService.apiKey
-
     var body: some View {
-        List {
-            Section {
-                LabeledContent("OpenSubtitles API Key") {
-                    TextField("Enter API Key", text: $apiKey)
-                        .multilineTextAlignment(.trailing)
-                        .autocorrectionDisabled()
-                        .onChange(of: apiKey) { _, newValue in
-                            OpenSubtitlesService.apiKey = newValue
-                        }
-                }
-            } header: {
-                Text("OpenSubtitles")
-            } footer: {
-                Text("An API key from api.opensubtitles.com is required to search and download subtitles. Register at opensubtitles.com to get one.")
-            }
-
-            Section {
-                Button("Clear Subtitle Cache") {
-                    try? OpenSubtitlesService.clearCache()
-                }
-            } header: {
-                Text("Cache")
-            } footer: {
-                Text("Removes all downloaded subtitle files from the local cache.")
-            }
-        }
-        .navigationTitle("Subtitles")
+        SubtitleStyleView(onStyleChanged: nil)
     }
 }

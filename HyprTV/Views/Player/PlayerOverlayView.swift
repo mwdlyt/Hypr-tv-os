@@ -83,12 +83,7 @@ struct PlayerOverlayView: View {
             AudioTrackPickerView(viewModel: viewModel)
         }
         .sheet(isPresented: $showSubtitlePicker) {
-            SubtitlePickerView(
-                viewModel: viewModel,
-                itemName: currentItem?.name ?? "",
-                imdbId: currentItem?.providerIds?["Imdb"],
-                onExternalSubtitleLoaded: onExternalSubtitleLoaded
-            )
+            SubtitlePickerView(viewModel: viewModel)
         }
     }
 
