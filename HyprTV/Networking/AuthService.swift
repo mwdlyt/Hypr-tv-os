@@ -123,7 +123,9 @@ final class AuthService {
             id: userId,
             name: "",
             serverId: "",
-            hasPassword: true
+            hasPassword: true,
+            primaryImageTag: nil,
+            policy: nil
         )
         return true
     }
