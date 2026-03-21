@@ -18,10 +18,23 @@ final class AppRouter {
 
     var path = NavigationPath()
 
+    /// When set, a full-screen player overlay is presented (hides tab bar).
+    var nowPlayingItemId: String?
+
     // MARK: - Navigation
 
     func navigate(to destination: Destination) {
+        // Player gets special treatment — presented as full-screen overlay
+        if case .player(let itemId) = destination {
+            nowPlayingItemId = itemId
+            return
+        }
         path.append(destination)
+    }
+
+    /// Dismisses the full-screen player overlay.
+    func dismissPlayer() {
+        nowPlayingItemId = nil
     }
 
     func goBack() {

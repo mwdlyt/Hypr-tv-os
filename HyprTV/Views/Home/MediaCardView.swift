@@ -17,7 +17,7 @@ struct MediaCardView: View {
         Button {
             router.navigate(to: .mediaDetail(itemId: item.id))
         } label: {
-            VStack(spacing: 10) {
+            VStack(alignment: .center, spacing: 10) {
                 // Portrait poster image with overlays
                 ZStack(alignment: .bottom) {
                     ZStack(alignment: .topTrailing) {
@@ -43,12 +43,9 @@ struct MediaCardView: View {
                             VStack {
                                 Spacer()
                                 ZStack(alignment: .leading) {
-                                    // Background track
                                     Rectangle()
                                         .fill(.black.opacity(0.6))
                                         .frame(height: 4)
-
-                                    // Progress fill
                                     Rectangle()
                                         .fill(.blue)
                                         .frame(width: geo.size.width * progress, height: 4)
@@ -59,36 +56,33 @@ struct MediaCardView: View {
                 }
                 .frame(width: Constants.Layout.posterWidth, height: Constants.Layout.posterHeight)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
+                // Focus glow — subtle white border instead of system's big square
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .strokeBorder(.white.opacity(isFocused ? 0.8 : 0), lineWidth: 2)
+                )
                 .shadow(
-                    color: isFocused ? .white.opacity(0.3) : .clear,
-                    radius: isFocused ? 12 : 0
+                    color: isFocused ? .white.opacity(0.25) : .clear,
+                    radius: isFocused ? 15 : 0
                 )
 
-                // Title + metadata below poster
+                // Title + metadata below poster — always visible, expands on focus
                 VStack(spacing: 4) {
                     Text(displayTitle)
                         .font(.caption)
                         .fontWeight(.semibold)
                         .foregroundStyle(.white)
-                        .lineLimit(1)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.center)
 
                     if isFocused {
                         HStack(spacing: 6) {
-                            // Content rating badge
-                            if let officialRating = item.officialRating, !officialRating.isEmpty {
-                                Text(officialRating)
-                                    .font(.system(size: 9, weight: .bold))
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 5)
-                                    .padding(.vertical, 2)
-                                    .background(ratingBadgeColor(for: officialRating), in: RoundedRectangle(cornerRadius: 3))
-                            }
-
                             if let year = item.productionYear {
                                 Text(String(year))
                                     .font(.caption2)
                                     .foregroundStyle(.white.opacity(0.6))
                             }
+
                             if let rating = item.communityRating {
                                 HStack(spacing: 2) {
                                     Image(systemName: "star.fill")
@@ -99,14 +93,24 @@ struct MediaCardView: View {
                                         .foregroundStyle(.white.opacity(0.6))
                                 }
                             }
+
+                            if let officialRating = item.officialRating, !officialRating.isEmpty {
+                                Text(officialRating)
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundStyle(.white.opacity(0.8))
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 1)
+                                    .background(.white.opacity(0.15), in: RoundedRectangle(cornerRadius: 3))
+                            }
                         }
                         .transition(.opacity)
                     }
                 }
-                .frame(width: Constants.Layout.posterWidth)
+                .frame(width: Constants.Layout.posterWidth + 20) // slightly wider than poster for text
             }
         }
-        .buttonStyle(.plain)
+        // Suppress the default tvOS button focus rectangle
+        .buttonStyle(.borderless)
         .focused($isFocused)
         .scaleEffect(isFocused ? 1.08 : 1.0)
         .animation(.easeInOut(duration: 0.2), value: isFocused)
@@ -119,7 +123,6 @@ struct MediaCardView: View {
 
     // MARK: - Computed Properties
 
-    /// Returns 0...1 progress for partially watched items, nil if unwatched.
     private var watchProgress: Double? {
         guard let ticks = item.userData?.playbackPositionTicks,
               let totalTicks = item.runTimeTicks,
@@ -128,30 +131,13 @@ struct MediaCardView: View {
     }
 
     private var displayTitle: String {
-        // For episodes, show the series name (e.g. "Rick and Morty") not "E5 - Meeseeks..."
         if item.type == .episode, let seriesName = item.seriesName {
             return seriesName
         }
         return item.name
     }
 
-    private func ratingBadgeColor(for rating: String) -> Color {
-        switch rating {
-        case "G", "TV-Y", "TV-Y7", "TV-G":
-            return .green.opacity(0.8)
-        case "PG", "TV-PG":
-            return .blue.opacity(0.8)
-        case "PG-13", "TV-14":
-            return .orange.opacity(0.8)
-        case "R", "TV-MA", "NC-17":
-            return .red.opacity(0.8)
-        default:
-            return .gray.opacity(0.8)
-        }
-    }
-
     private var posterURL: URL? {
-        // For episodes, use the SERIES poster art instead of the episode thumbnail
         if item.type == .episode, let seriesId = item.seriesId {
             return jellyfinClient.imageURL(
                 itemId: seriesId,

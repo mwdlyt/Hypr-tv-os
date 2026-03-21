@@ -114,6 +114,7 @@ struct PlayerView: View {
                 await viewModel?.reportStop()
             }
             playerWrapper.stop()
+            router.dismissPlayer()
         }
         .onChange(of: viewModel?.currentTime) { _, _ in
             viewModel?.checkSegmentOverlay()

@@ -9,34 +9,43 @@ struct RootView: View {
 
         Group {
             if jellyfinClient.isAuthenticated {
-                TabView {
-                    // Home tab
-                    NavigationStack(path: $router.path) {
-                        HomeView()
-                            .navigationDestination(for: AppRouter.Destination.self) { destination in
-                                destinationView(for: destination)
-                            }
-                    }
-                    .tabItem {
-                        Label("Home", systemImage: "house.fill")
+                ZStack {
+                    // Main tab interface
+                    TabView {
+                        NavigationStack(path: $router.path) {
+                            HomeView()
+                                .navigationDestination(for: AppRouter.Destination.self) { destination in
+                                    destinationView(for: destination)
+                                }
+                        }
+                        .tabItem {
+                            Label("Home", systemImage: "house.fill")
+                        }
+
+                        NavigationStack {
+                            SearchView()
+                        }
+                        .tabItem {
+                            Label("Search", systemImage: "magnifyingglass")
+                        }
+
+                        NavigationStack {
+                            SettingsView()
+                        }
+                        .tabItem {
+                            Label("Settings", systemImage: "gearshape.fill")
+                        }
                     }
 
-                    // Search tab
-                    NavigationStack {
-                        SearchView()
-                    }
-                    .tabItem {
-                        Label("Search", systemImage: "magnifyingglass")
-                    }
-
-                    // Settings tab
-                    NavigationStack {
-                        SettingsView()
-                    }
-                    .tabItem {
-                        Label("Settings", systemImage: "gearshape.fill")
+                    // Full-screen player overlay — hides tab bar completely
+                    if let playingItemId = router.nowPlayingItemId {
+                        PlayerView(itemId: playingItemId)
+                            .ignoresSafeArea()
+                            .transition(.opacity)
+                            .zIndex(100)
                     }
                 }
+                .animation(.easeInOut(duration: 0.3), value: router.nowPlayingItemId)
             } else {
                 ServerConnectionView()
             }
@@ -54,6 +63,7 @@ struct RootView: View {
         case .mediaDetail(let itemId):
             MediaDetailView(itemId: itemId)
         case .player(let itemId):
+            // Player is now handled as a full-screen overlay — this is a fallback
             PlayerView(itemId: itemId)
         case .search:
             SearchView()

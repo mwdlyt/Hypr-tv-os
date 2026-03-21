@@ -176,7 +176,7 @@ enum Endpoint {
                 URLQueryItem(name: "StartIndex", value: "\(startIndex)"),
                 URLQueryItem(name: "Limit", value: "\(limit)"),
                 URLQueryItem(name: "Recursive", value: "true"),
-                URLQueryItem(name: "IncludeItemTypes", value: "Movie,Series,Episode"),
+                URLQueryItem(name: "IncludeItemTypes", value: "Movie,Series"),
                 URLQueryItem(name: "Fields", value: "Overview,UserData,PrimaryImageAspectRatio")
             ]
             if let maxOfficialRating { items.append(URLQueryItem(name: "MaxOfficialRating", value: maxOfficialRating)) }
