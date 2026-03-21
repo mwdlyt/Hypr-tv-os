@@ -145,22 +145,71 @@ struct UserProfilePickerView: View {
 
     // MARK: - Empty State
 
+    @State private var manualUsername: String = ""
+    @State private var manualPassword: String = ""
+    @State private var isManualLoading: Bool = false
+
     private var emptyState: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "person.3.fill")
+        VStack(spacing: 24) {
+            Image(systemName: "person.crop.circle.badge.questionmark")
                 .font(.system(size: 48))
                 .foregroundStyle(.secondary)
 
-            Text("No Public Users")
-                .font(.title3)
-                .fontWeight(.semibold)
+            Text("Sign In")
+                .font(.title2)
+                .fontWeight(.bold)
 
-            Text("This server has no public user profiles.\nYou can sign in manually below.")
+            Text("Enter your username and password to continue.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+
+            VStack(spacing: 16) {
+                TextField("Username", text: $manualUsername)
+                    .textContentType(.username)
+                    .autocorrectionDisabled()
+                    .padding()
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    .frame(maxWidth: 400)
+
+                SecureField("Password", text: $manualPassword)
+                    .textContentType(.password)
+                    .padding()
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    .frame(maxWidth: 400)
+
+                Button {
+                    Task { await manualLogin() }
+                } label: {
+                    HStack {
+                        if isManualLoading {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                        }
+                        Text("Sign In")
+                            .fontWeight(.semibold)
+                    }
+                    .frame(maxWidth: 400)
+                    .padding(.vertical, 14)
+                    .background(.blue, in: RoundedRectangle(cornerRadius: 12))
+                    .foregroundStyle(.white)
+                }
+                .buttonStyle(.plain)
+                .disabled(manualUsername.isEmpty || isManualLoading)
+            }
+            .padding(.top, 8)
         }
         .padding(.top, 40)
+    }
+
+    private func manualLogin() async {
+        isManualLoading = true
+        defer { isManualLoading = false }
+        do {
+            _ = try await jellyfinClient.authenticate(username: manualUsername, password: manualPassword)
+        } catch {
+            viewModel.error = "Sign in failed: \(error.localizedDescription)"
+        }
     }
 
     // MARK: - Error Banner
