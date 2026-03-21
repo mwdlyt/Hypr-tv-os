@@ -54,13 +54,23 @@ struct ServerConnectionView: View {
                 loginScreen(viewModel: viewModel)
             }
         case .authenticated:
+            // Briefly shown while RootView transitions to HomeView
             VStack(spacing: 16) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 64))
-                    .foregroundStyle(.green)
-                Text("Connected")
-                    .font(.title2)
-                    .fontWeight(.semibold)
+                ProgressView()
+                    .scaleEffect(1.5)
+                Text("Loading...")
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+            }
+            .task {
+                // Force a small delay then re-check — if RootView hasn't swapped yet,
+                // it means jellyfinClient.isAuthenticated isn't being observed.
+                // This shouldn't normally be needed but acts as a safety net.
+                try? await Task.sleep(for: .seconds(1))
+                if !jellyfinClient.isAuthenticated {
+                    // Auth state didn't propagate — force it
+                    viewModel.goBackToServerSelection()
+                }
             }
         }
     }
