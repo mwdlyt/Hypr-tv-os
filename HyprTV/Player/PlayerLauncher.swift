@@ -3,7 +3,7 @@ import UIKit
 import os
 
 /// Presents AVPlayerViewController using native UIKit modal presentation.
-/// This is the ONLY way to get proper rendering + Siri Remote controls on tvOS.
+/// Handles audio track switching and subtitle loading.
 @MainActor
 final class PlayerLauncher: NSObject {
 
@@ -13,9 +13,19 @@ final class PlayerLauncher: NSObject {
     private var playerVC: AVPlayerViewController?
     private var dismissCheckTask: Task<Void, Never>?
 
+    // Current playback state (for track switching)
+    private var currentItemId: String?
+    private var currentClient: JellyfinClient?
+    private var currentSource: MediaSourceDTO?
+    private var currentPlaySessionId: String?
+    private var currentAudioIndex: Int?
+    private var audioTracks: [AudioTrack] = []
+    private var subtitleTracks: [SubtitleTrack] = []
+
     private override init() { super.init() }
 
-    /// Load media info from Jellyfin and present the native player.
+    // MARK: - Launch
+
     func launch(itemId: String, client: JellyfinClient) {
         guard playerVC == nil else {
             logger.warning("Player already presented, ignoring launch")
@@ -32,10 +42,26 @@ final class PlayerLauncher: NSObject {
                     return
                 }
 
+                // Parse audio and subtitle tracks
+                audioTracks = MediaTrackParser.audioTracks(from: source.mediaStreams)
+                subtitleTracks = MediaTrackParser.subtitleTracks(from: source.mediaStreams)
+
+                // Find default audio index
+                let defaultAudioIndex = audioTracks.first(where: { $0.isDefault })?.id
+                    ?? audioTracks.first?.id ?? 1
+
+                // Store state for track switching
+                currentItemId = itemId
+                currentClient = client
+                currentSource = source
+                currentPlaySessionId = response.playSessionId
+                currentAudioIndex = defaultAudioIndex
+
                 let streamURL = buildStreamURL(
                     source: source,
                     itemId: itemId,
                     playSessionId: response.playSessionId,
+                    audioStreamIndex: defaultAudioIndex,
                     client: client
                 )
 
@@ -45,14 +71,12 @@ final class PlayerLauncher: NSObject {
                 }
 
                 logger.info("Playing: \(item?.name ?? itemId)")
-                logger.info("Container: \(source.container ?? "?")")
-                logger.info("Stream URL: \(streamURL.absoluteString.prefix(150))")
+                logger.info("Audio tracks: \(self.audioTracks.count), Subtitle tracks: \(self.subtitleTracks.count)")
 
-                // Create AVPlayer with the stream URL
-                let asset = AVURLAsset(url: streamURL)
-                let playerItem = AVPlayerItem(asset: asset)
+                // Create player
+                let player = AVPlayer(url: streamURL)
 
-                // Set metadata for native transport bar
+                // Set metadata
                 var metadata: [AVMetadataItem] = []
                 if let name = item?.name {
                     let titleItem = AVMutableMetadataItem()
@@ -60,33 +84,37 @@ final class PlayerLauncher: NSObject {
                     titleItem.value = name as NSString
                     metadata.append(titleItem)
                 }
-                playerItem.externalMetadata = metadata
+                player.currentItem?.externalMetadata = metadata
 
-                let player = AVPlayer(playerItem: playerItem)
-
-                // Observe for errors
-                let errorObserver = playerItem.observe(\.status) { item, _ in
-                    if item.status == .failed {
-                        print("❌ AVPlayerItem FAILED: \(item.error?.localizedDescription ?? "unknown")")
-                    } else if item.status == .readyToPlay {
-                        print("✅ AVPlayerItem ready to play")
-                    }
-                }
-
-                // Resume from saved position
+                // Resume position
                 if let ticks = item?.userData?.playbackPositionTicks, ticks > 0 {
                     let seconds = Double(ticks) / 10_000_000.0
                     await player.seek(to: CMTime(seconds: seconds, preferredTimescale: 1000))
                 }
 
-                // Present AVPlayerViewController
+                // Present player with custom info panel
                 let vc = AVPlayerViewController()
                 vc.player = player
                 vc.showsPlaybackControls = true
+
+                // Add custom info view controller for audio/subtitle selection
+                let infoVC = TrackSelectionViewController(
+                    audioTracks: audioTracks,
+                    subtitleTracks: subtitleTracks,
+                    currentAudioIndex: defaultAudioIndex,
+                    onAudioSelected: { [weak self] audioIndex in
+                        self?.switchAudioTrack(to: audioIndex)
+                    },
+                    onSubtitleSelected: { [weak self] subtitleIndex in
+                        self?.loadSubtitle(index: subtitleIndex)
+                    }
+                )
+                vc.customInfoViewController = infoVC
+
                 self.playerVC = vc
 
                 guard let rootVC = self.topViewController() else {
-                    logger.error("No root view controller available")
+                    logger.error("No root view controller")
                     self.playerVC = nil
                     return
                 }
@@ -97,81 +125,192 @@ final class PlayerLauncher: NSObject {
                     self.logger.info("Player presented — playback started")
                 }
 
-                // Report playback start
+                // Report start
                 try? await client.reportPlaybackStart(
                     itemId: itemId,
                     mediaSourceId: source.id,
                     playSessionId: response.playSessionId
                 )
 
-                // Monitor for dismissal
-                self.startDismissMonitor(
-                    itemId: itemId,
-                    client: client,
-                    playSessionId: response.playSessionId
-                )
-
-                // Hold error observer reference
-                withExtendedLifetime(errorObserver) {}
+                // Monitor dismiss
+                self.startDismissMonitor(itemId: itemId, client: client, playSessionId: response.playSessionId)
 
             } catch {
-                logger.error("Failed to launch player: \(error.localizedDescription)")
+                logger.error("Failed to launch: \(error.localizedDescription)")
             }
         }
     }
 
-    // MARK: - Stream URL Selection
+    // MARK: - Audio Track Switching
 
-    /// Determines the best stream URL based on what Jellyfin reports.
-    /// Priority: TranscodingUrl (Jellyfin decided) > Direct Stream > Fallback HLS
+    /// Switches the audio track by rebuilding the HLS stream URL with a different AudioStreamIndex.
+    /// Preserves the current playback position.
+    private func switchAudioTrack(to audioIndex: Int) {
+        guard let vc = playerVC,
+              let player = vc.player,
+              let itemId = currentItemId,
+              let client = currentClient,
+              let source = currentSource else { return }
+
+        // Save current position
+        let currentTime = player.currentTime()
+        currentAudioIndex = audioIndex
+
+        logger.info("Switching to audio track index \(audioIndex)")
+
+        // Build new URL with different audio index
+        guard let newURL = buildStreamURL(
+            source: source,
+            itemId: itemId,
+            playSessionId: currentPlaySessionId,
+            audioStreamIndex: audioIndex,
+            client: client
+        ) else { return }
+
+        // Replace the player item
+        let newItem = AVPlayerItem(url: newURL)
+        player.replaceCurrentItem(with: newItem)
+
+        // Seek to where we were
+        Task {
+            await player.seek(to: currentTime)
+            player.play()
+        }
+    }
+
+    // MARK: - Subtitle Loading
+
+    /// Loads an external subtitle track from Jellyfin and adds it to the player.
+    private func loadSubtitle(index: Int?) {
+        guard let vc = playerVC,
+              let player = vc.player,
+              let playerItem = player.currentItem,
+              let itemId = currentItemId,
+              let client = currentClient,
+              let source = currentSource else { return }
+
+        // index == nil means "Off"
+        guard let index else {
+            // Disable subtitles — select no legible option
+            if let group = playerItem.asset.mediaSelectionGroup(forMediaCharacteristic: .legible) {
+                playerItem.select(nil, in: group)
+            }
+            logger.info("Subtitles disabled")
+            return
+        }
+
+        // Build subtitle URL
+        guard let subtitleURL = client.subtitleURL(
+            itemId: itemId,
+            mediaSourceId: source.id,
+            subtitleIndex: index
+        ) else { return }
+
+        logger.info("Loading subtitle index \(index) from \(subtitleURL)")
+
+        // Add as external subtitle
+        // AVPlayer supports adding VTT subtitles as supplementary content
+        Task {
+            // For HLS streams, we can't add external subtitles directly.
+            // Instead, we'll use the Jellyfin subtitle burn-in approach:
+            // Rebuild the HLS URL with SubtitleStreamIndex parameter
+            let currentTime = player.currentTime()
+
+            guard var newURL = buildStreamURL(
+                source: source,
+                itemId: itemId,
+                playSessionId: currentPlaySessionId,
+                audioStreamIndex: currentAudioIndex ?? 1,
+                subtitleStreamIndex: index,
+                client: client
+            ) else { return }
+
+            let newItem = AVPlayerItem(url: newURL)
+            player.replaceCurrentItem(with: newItem)
+            await player.seek(to: currentTime)
+            player.play()
+            logger.info("Subtitle track \(index) activated (burn-in)")
+        }
+    }
+
+    // MARK: - Stream URL Building
+
     private func buildStreamURL(
         source: MediaSourceDTO,
         itemId: String,
         playSessionId: String?,
+        audioStreamIndex: Int = 1,
+        subtitleStreamIndex: Int? = nil,
         client: JellyfinClient
     ) -> URL? {
         guard let baseURL = client.baseURL else { return nil }
 
-        // Option 1: Server provided a transcoding URL — use it.
-        // This means Jellyfin decided the content needs transcoding/remuxing.
+        // Option 1: Use transcoding URL from server (modify audio/subtitle indices)
         if let transcodingPath = source.transcodingUrl, !transcodingPath.isEmpty {
-            if let url = URL(string: transcodingPath, relativeTo: baseURL) {
-                logger.info("Using TranscodingUrl from server")
+            // The TranscodingUrl already has AudioStreamIndex — we need to replace it
+            var modifiedPath = transcodingPath
+
+            // Replace AudioStreamIndex
+            if let range = modifiedPath.range(of: "AudioStreamIndex=\\d+", options: .regularExpression) {
+                modifiedPath.replaceSubrange(range, with: "AudioStreamIndex=\(audioStreamIndex)")
+            } else {
+                modifiedPath += "&AudioStreamIndex=\(audioStreamIndex)"
+            }
+
+            // Add or replace SubtitleStreamIndex
+            if let subIndex = subtitleStreamIndex {
+                if let range = modifiedPath.range(of: "SubtitleStreamIndex=\\d+", options: .regularExpression) {
+                    modifiedPath.replaceSubrange(range, with: "SubtitleStreamIndex=\(subIndex)")
+                } else {
+                    modifiedPath += "&SubtitleStreamIndex=\(subIndex)&SubtitleMethod=Encode"
+                }
+            } else {
+                // Remove subtitle params if present
+                modifiedPath = modifiedPath.replacingOccurrences(
+                    of: "&SubtitleStreamIndex=\\d+", with: "", options: .regularExpression
+                )
+                modifiedPath = modifiedPath.replacingOccurrences(
+                    of: "&SubtitleMethod=Encode", with: ""
+                )
+            }
+
+            if let url = URL(string: modifiedPath, relativeTo: baseURL) {
+                logger.info("Using TranscodingUrl (audio=\(audioStreamIndex), sub=\(subtitleStreamIndex ?? -1))")
                 return url.absoluteURL
             }
         }
 
-        // Option 2: Content can be direct streamed.
-        // For MP4/MOV containers with compatible codecs, just stream the file.
+        // Option 2: Direct stream for compatible containers
         let container = source.container?.lowercased() ?? ""
         if ["mp4", "m4v", "mov"].contains(where: { container.contains($0) }) {
             if let token = client.accessToken {
-                var components = URLComponents(url: baseURL.appendingPathComponent("/Videos/\(itemId)/stream"), resolvingAgainstBaseURL: false)
+                var components = URLComponents(
+                    url: baseURL.appendingPathComponent("/Videos/\(itemId)/stream"),
+                    resolvingAgainstBaseURL: false
+                )
                 components?.queryItems = [
                     URLQueryItem(name: "static", value: "true"),
                     URLQueryItem(name: "api_key", value: token),
                     URLQueryItem(name: "MediaSourceId", value: source.id)
                 ]
                 if let url = components?.url {
-                    logger.info("Using direct static stream (compatible container: \(container))")
                     return url
                 }
             }
         }
 
-        // Option 3: Fallback to our HLS URL builder
+        // Option 3: Fallback HLS
         return client.streamURL(itemId: itemId, mediaSourceId: source.id, playSessionId: playSessionId)
     }
 
-    /// Dismiss the player programmatically.
+    // MARK: - Dismiss
+
     func dismiss() {
         playerVC?.player?.pause()
         playerVC?.dismiss(animated: true) { [weak self] in
             self?.cleanup()
         }
     }
-
-    // MARK: - Private
 
     private func startDismissMonitor(itemId: String, client: JellyfinClient, playSessionId: String?) {
         dismissCheckTask?.cancel()
@@ -200,6 +339,13 @@ final class PlayerLauncher: NSObject {
         playerVC?.player?.pause()
         playerVC?.player = nil
         playerVC = nil
+        currentItemId = nil
+        currentClient = nil
+        currentSource = nil
+        currentPlaySessionId = nil
+        currentAudioIndex = nil
+        audioTracks = []
+        subtitleTracks = []
         logger.info("Player cleaned up")
     }
 

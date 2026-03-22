@@ -593,6 +593,17 @@ final class JellyfinClient {
         return components?.url
     }
 
+    /// Returns a URL to fetch a subtitle stream in WebVTT format.
+    func subtitleURL(itemId: String, mediaSourceId: String, subtitleIndex: Int) -> URL? {
+        guard let baseURL, let token = accessToken else { return nil }
+        var components = URLComponents(
+            url: baseURL.appendingPathComponent("/Videos/\(itemId)/\(mediaSourceId)/Subtitles/\(subtitleIndex)/Stream.vtt"),
+            resolvingAgainstBaseURL: false
+        )
+        components?.queryItems = [URLQueryItem(name: "api_key", value: token)]
+        return components?.url
+    }
+
     // MARK: - Session Restoration
 
     /// Restores a previously saved session without re-authenticating.
