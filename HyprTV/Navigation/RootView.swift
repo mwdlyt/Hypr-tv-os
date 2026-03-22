@@ -9,59 +9,59 @@ struct RootView: View {
 
         Group {
             if jellyfinClient.isAuthenticated {
-                ZStack {
-                    TabView(selection: Binding(
-                        get: { router.activeTab },
-                        set: { router.activeTab = $0 }
-                    )) {
-                        // Home tab
-                        NavigationStack(path: $router.path) {
-                            HomeView()
-                                .navigationDestination(for: AppRouter.Destination.self) { destination in
-                                    destinationView(for: destination)
-                                }
+                mainTabView
+                    // Player is presented as a fullScreenCover from the tab view
+                    .fullScreenCover(item: Binding(
+                        get: { router.nowPlayingItemId.map { PlayerItemID(id: $0) } },
+                        set: { newValue in
+                            if newValue == nil {
+                                router.nowPlayingItemId = nil
+                            }
                         }
-                        .tabItem {
-                            Label("Home", systemImage: "house.fill")
-                        }
-                        .tag(AppRouter.Tab.home)
-
-                        // Search tab
-                        NavigationStack(path: $router.searchPath) {
-                            SearchView()
-                                .navigationDestination(for: AppRouter.Destination.self) { destination in
-                                    destinationView(for: destination)
-                                }
-                        }
-                        .tabItem {
-                            Label("Search", systemImage: "magnifyingglass")
-                        }
-                        .tag(AppRouter.Tab.search)
-
-                        // Settings tab
-                        NavigationStack {
-                            SettingsView()
-                        }
-                        .tabItem {
-                            Label("Settings", systemImage: "gearshape.fill")
-                        }
-                        .tag(AppRouter.Tab.settings)
-                    }
-
-                    // Full-screen player overlay — hides tab bar completely
-                    if let playingItemId = router.nowPlayingItemId {
-                        PlayerView(itemId: playingItemId)
+                    )) { item in
+                        PlayerView(itemId: item.id)
                             .ignoresSafeArea()
-                            .transition(.opacity)
-                            .zIndex(100)
                     }
-                }
-                .animation(.easeInOut(duration: 0.3), value: router.nowPlayingItemId)
             } else {
                 ServerConnectionView()
             }
         }
         .animation(.easeInOut, value: jellyfinClient.isAuthenticated)
+    }
+
+    // MARK: - Tab View
+
+    private var mainTabView: some View {
+        @Bindable var router = router
+
+        return TabView(selection: Binding(
+            get: { router.activeTab },
+            set: { router.activeTab = $0 }
+        )) {
+            NavigationStack(path: $router.path) {
+                HomeView()
+                    .navigationDestination(for: AppRouter.Destination.self) { destination in
+                        destinationView(for: destination)
+                    }
+            }
+            .tabItem { Label("Home", systemImage: "house.fill") }
+            .tag(AppRouter.Tab.home)
+
+            NavigationStack(path: $router.searchPath) {
+                SearchView()
+                    .navigationDestination(for: AppRouter.Destination.self) { destination in
+                        destinationView(for: destination)
+                    }
+            }
+            .tabItem { Label("Search", systemImage: "magnifyingglass") }
+            .tag(AppRouter.Tab.search)
+
+            NavigationStack {
+                SettingsView()
+            }
+            .tabItem { Label("Settings", systemImage: "gearshape.fill") }
+            .tag(AppRouter.Tab.settings)
+        }
     }
 
     @ViewBuilder
@@ -81,4 +81,9 @@ struct RootView: View {
             SettingsView()
         }
     }
+}
+
+/// Identifiable wrapper for player item ID (needed for fullScreenCover item binding).
+struct PlayerItemID: Identifiable {
+    let id: String
 }
