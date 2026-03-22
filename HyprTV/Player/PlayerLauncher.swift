@@ -35,7 +35,7 @@ final class PlayerLauncher: NSObject {
                     return
                 }
 
-                guard let streamURL = client.streamURL(itemId: itemId, mediaSourceId: source.id) else {
+                guard let streamURL = client.streamURL(itemId: itemId, mediaSourceId: source.id, playSessionId: response.playSessionId) else {
                     logger.error("Could not build stream URL for \(itemId)")
                     return
                 }

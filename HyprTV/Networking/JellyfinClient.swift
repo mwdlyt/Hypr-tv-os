@@ -472,24 +472,44 @@ final class JellyfinClient {
 
     /// Constructs a direct stream URL for playback with authentication baked in.
     /// Returns an HLS master playlist URL for the given item.
-    /// Jellyfin will transcode if needed (MKV → HLS) or direct-stream compatible formats.
-    func streamURL(itemId: String, mediaSourceId: String? = nil) -> URL? {
-        guard let baseURL, let token = accessToken, let userId else { return nil }
+    /// Includes full transcoding parameters so Jellyfin properly handles:
+    /// - MKV → HLS remux/transcode
+    /// - HDR → SDR tonemapping when needed
+    /// - TrueHD/DTS → AAC audio transcoding
+    /// - 4K HEVC pass-through when compatible
+    func streamURL(itemId: String, mediaSourceId: String? = nil, playSessionId: String? = nil) -> URL? {
+        guard let baseURL, let token = accessToken else { return nil }
 
         var components = URLComponents(url: baseURL.appendingPathComponent("/Videos/\(itemId)/master.m3u8"), resolvingAgainstBaseURL: false)
         var queryItems = [
             URLQueryItem(name: "api_key", value: token),
             URLQueryItem(name: "DeviceId", value: deviceId),
-            URLQueryItem(name: "VideoCodec", value: "h264,hevc"),
-            URLQueryItem(name: "AudioCodec", value: "aac,ac3,eac3"),
-            URLQueryItem(name: "TranscodingMaxAudioChannels", value: "6"),
+            // Video: Apple TV 4K supports H.264 and HEVC hardware decode
+            URLQueryItem(name: "VideoCodec", value: "hevc,h264"),
+            // Audio: codecs AVPlayer supports natively
+            URLQueryItem(name: "AudioCodec", value: "aac,ac3,eac3,flac,alac"),
+            // Max bitrate — triggers transcoding for incompatible streams
+            // 120 Mbps allows most 4K remux to pass through
+            URLQueryItem(name: "MaxStreamingBitrate", value: "120000000"),
+            URLQueryItem(name: "MaxAudioChannels", value: "8"),
+            URLQueryItem(name: "TranscodingMaxAudioChannels", value: "8"),
+            // HLS segment settings
             URLQueryItem(name: "SegmentContainer", value: "ts"),
-            URLQueryItem(name: "MinSegments", value: "1"),
+            URLQueryItem(name: "MinSegments", value: "2"),
             URLQueryItem(name: "BreakOnNonKeyFrames", value: "true"),
-            URLQueryItem(name: "TranscodeReasons", value: "ContainerNotSupported"),
+            // Container support — tell Jellyfin what containers we handle
+            URLQueryItem(name: "TranscodingContainer", value: "ts"),
+            URLQueryItem(name: "TranscodingProtocol", value: "hls"),
+            // Subtitle method — deliver as separate stream
+            URLQueryItem(name: "SubtitleMethod", value: "Encode"),
+            // Context
+            URLQueryItem(name: "context", value: "Streaming"),
         ]
         if let mediaSourceId {
             queryItems.append(URLQueryItem(name: "MediaSourceId", value: mediaSourceId))
+        }
+        if let playSessionId {
+            queryItems.append(URLQueryItem(name: "PlaySessionId", value: playSessionId))
         }
         components?.queryItems = queryItems
         return components?.url
