@@ -9,22 +9,16 @@ struct RootView: View {
 
         Group {
             if jellyfinClient.isAuthenticated {
-                ZStack {
-                    mainTabView
-
-                    // Thin PlayerView layer handles loading/errors and launches UIKit player
-                    if let playingItemId = router.nowPlayingItemId {
-                        PlayerView(itemId: playingItemId)
-                            .ignoresSafeArea()
-                            .zIndex(100)
-                    }
-                }
-                .animation(.easeInOut(duration: 0.2), value: router.nowPlayingItemId)
+                mainTabView
             } else {
                 ServerConnectionView()
             }
         }
         .animation(.easeInOut, value: jellyfinClient.isAuthenticated)
+        .onAppear {
+            // Give the router access to the client for player launches
+            router.jellyfinClient = jellyfinClient
+        }
     }
 
     // MARK: - Tab View
@@ -71,8 +65,9 @@ struct RootView: View {
             LibraryView(library: library)
         case .mediaDetail(let itemId):
             MediaDetailView(itemId: itemId)
-        case .player(let itemId):
-            PlayerView(itemId: itemId)
+        case .player:
+            // Player is handled via UIKit, this shouldn't be reached
+            EmptyView()
         case .search:
             SearchView()
         case .settings:

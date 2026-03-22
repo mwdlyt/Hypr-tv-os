@@ -16,17 +16,12 @@ final class AppRouter {
 
     // MARK: - State
 
-    /// Navigation path for the Home tab.
     var path = NavigationPath()
-
-    /// Navigation path for the Search tab.
     var searchPath = NavigationPath()
-
-    /// Tracks which tab is active to route navigation correctly.
     var activeTab: Tab = .home
 
-    /// When set, a full-screen player overlay is presented (hides tab bar).
-    var nowPlayingItemId: String?
+    /// Reference to the Jellyfin client for player launches.
+    var jellyfinClient: JellyfinClient?
 
     enum Tab {
         case home, search, settings
@@ -35,12 +30,11 @@ final class AppRouter {
     // MARK: - Navigation
 
     func navigate(to destination: Destination) {
-        // Player gets special treatment — presented as full-screen overlay
+        // Player launches via UIKit — no SwiftUI involvement
         if case .player(let itemId) = destination {
-            nowPlayingItemId = itemId
+            playMedia(itemId: itemId)
             return
         }
-        // Push to whichever tab's navigation stack is active
         switch activeTab {
         case .search:
             searchPath.append(destination)
@@ -49,9 +43,12 @@ final class AppRouter {
         }
     }
 
-    /// Dismisses the full-screen player overlay.
-    func dismissPlayer() {
-        nowPlayingItemId = nil
+    /// Launch media playback via UIKit AVPlayerViewController.
+    func playMedia(itemId: String) {
+        guard let client = jellyfinClient else { return }
+        Task { @MainActor in
+            PlayerLauncher.shared.launch(itemId: itemId, client: client)
+        }
     }
 
     func goBack() {
