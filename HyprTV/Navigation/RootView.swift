@@ -10,8 +10,11 @@ struct RootView: View {
         Group {
             if jellyfinClient.isAuthenticated {
                 ZStack {
-                    // Main tab interface
-                    TabView {
+                    TabView(selection: Binding(
+                        get: { router.activeTab },
+                        set: { router.activeTab = $0 }
+                    )) {
+                        // Home tab
                         NavigationStack(path: $router.path) {
                             HomeView()
                                 .navigationDestination(for: AppRouter.Destination.self) { destination in
@@ -21,20 +24,28 @@ struct RootView: View {
                         .tabItem {
                             Label("Home", systemImage: "house.fill")
                         }
+                        .tag(AppRouter.Tab.home)
 
-                        NavigationStack {
+                        // Search tab
+                        NavigationStack(path: $router.searchPath) {
                             SearchView()
+                                .navigationDestination(for: AppRouter.Destination.self) { destination in
+                                    destinationView(for: destination)
+                                }
                         }
                         .tabItem {
                             Label("Search", systemImage: "magnifyingglass")
                         }
+                        .tag(AppRouter.Tab.search)
 
+                        // Settings tab
                         NavigationStack {
                             SettingsView()
                         }
                         .tabItem {
                             Label("Settings", systemImage: "gearshape.fill")
                         }
+                        .tag(AppRouter.Tab.settings)
                     }
 
                     // Full-screen player overlay — hides tab bar completely
@@ -63,7 +74,6 @@ struct RootView: View {
         case .mediaDetail(let itemId):
             MediaDetailView(itemId: itemId)
         case .player(let itemId):
-            // Player is now handled as a full-screen overlay — this is a fallback
             PlayerView(itemId: itemId)
         case .search:
             SearchView()

@@ -22,7 +22,7 @@ final class UserProfileViewModel {
     // MARK: - Dependencies
 
     private let client: JellyfinClient
-    private let authService: AuthService
+    let authService: AuthService
 
     // MARK: - Init
 

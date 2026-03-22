@@ -206,7 +206,8 @@ struct UserProfilePickerView: View {
         isManualLoading = true
         defer { isManualLoading = false }
         do {
-            _ = try await jellyfinClient.authenticate(username: manualUsername, password: manualPassword)
+            // Use authService.login() to save credentials to Keychain for session persistence
+            try await viewModel.authService.login(username: manualUsername, password: manualPassword)
         } catch {
             viewModel.error = "Sign in failed: \(error.localizedDescription)"
         }

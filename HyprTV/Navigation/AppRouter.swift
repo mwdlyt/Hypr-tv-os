@@ -16,10 +16,21 @@ final class AppRouter {
 
     // MARK: - State
 
+    /// Navigation path for the Home tab.
     var path = NavigationPath()
+
+    /// Navigation path for the Search tab.
+    var searchPath = NavigationPath()
+
+    /// Tracks which tab is active to route navigation correctly.
+    var activeTab: Tab = .home
 
     /// When set, a full-screen player overlay is presented (hides tab bar).
     var nowPlayingItemId: String?
+
+    enum Tab {
+        case home, search, settings
+    }
 
     // MARK: - Navigation
 
@@ -29,7 +40,13 @@ final class AppRouter {
             nowPlayingItemId = itemId
             return
         }
-        path.append(destination)
+        // Push to whichever tab's navigation stack is active
+        switch activeTab {
+        case .search:
+            searchPath.append(destination)
+        default:
+            path.append(destination)
+        }
     }
 
     /// Dismisses the full-screen player overlay.
@@ -38,11 +55,22 @@ final class AppRouter {
     }
 
     func goBack() {
-        guard !path.isEmpty else { return }
-        path.removeLast()
+        switch activeTab {
+        case .search:
+            guard !searchPath.isEmpty else { return }
+            searchPath.removeLast()
+        default:
+            guard !path.isEmpty else { return }
+            path.removeLast()
+        }
     }
 
     func popToRoot() {
-        path = NavigationPath()
+        switch activeTab {
+        case .search:
+            searchPath = NavigationPath()
+        default:
+            path = NavigationPath()
+        }
     }
 }
