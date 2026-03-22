@@ -1,8 +1,12 @@
 import SwiftUI
+import AVKit
 
-/// Full-screen video player container.
-/// Hosts the VLC player view controller, transport controls overlay,
-/// and Netflix-style Up Next card for episodes.
+/// Full-screen video player using native AVPlayerViewController.
+/// This gives us:
+/// - Native Siri Remote support (swipe to seek, tap to play/pause, menu to exit)
+/// - Native transport controls (scrub bar, time display)
+/// - Proper tvOS UI conventions
+/// Plus our custom overlays: Skip Intro and Up Next.
 struct PlayerView: View {
 
     let itemId: String
@@ -11,145 +15,164 @@ struct PlayerView: View {
     @Environment(AppRouter.self) private var router
     @Environment(AudioSettings.self) private var audioSettings
     @State private var viewModel: PlayerViewModel?
-    @State private var playerWrapper = VLCPlayerWrapper()
+    @State private var avPlayer = AVPlayerWrapper()
     @State private var currentItem: MediaItemDTO?
+    @State private var isLoading = true
+    @State private var loadError: String?
 
     var body: some View {
         ZStack {
-            // Video layer
-            Color.black
-                .ignoresSafeArea()
+            Color.black.ignoresSafeArea()
 
-            if let viewModel {
-                // VLC player surface
-                PlayerRepresentable(playerWrapper: playerWrapper)
-                    .ignoresSafeArea()
-
-                // Transport overlay
-                PlayerOverlayView(
-                    viewModel: viewModel,
-                    currentItem: currentItem,
-                    onExternalSubtitleLoaded: { fileURL in
-                        playerWrapper.loadExternalSubtitle(fileURL: fileURL)
+            if let loadError {
+                // Error state
+                VStack(spacing: 16) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 48))
+                        .foregroundStyle(.yellow)
+                    Text("Playback Error")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                    Text(loadError)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 500)
+                    Button("Go Back") {
+                        router.dismissPlayer()
+                    }
+                    .padding(.top, 20)
+                }
+            } else if isLoading {
+                // Loading state
+                VStack(spacing: 16) {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                    Text("Preparing playback...")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                // Native AVPlayer view controller
+                AVPlayerRepresentable(
+                    player: avPlayer.player,
+                    onDismiss: {
+                        router.dismissPlayer()
                     }
                 )
-                    .opacity(viewModel.showOverlay ? 1 : 0)
-                    .animation(.easeInOut(duration: 0.3), value: viewModel.showOverlay)
+                .ignoresSafeArea()
 
-                // Skip button (bottom-right, above Up Next)
-                if let segment = viewModel.currentSegment {
+                // Skip Intro/Outro button overlay
+                if let vm = viewModel, let segment = vm.currentSegment {
                     VStack {
                         Spacer()
                         HStack {
                             Spacer()
                             SkipButton(segment: segment) {
-                                // Seek to end of segment
                                 let seekMs = segment.endTicks / 10_000
-                                playerWrapper.seek(to: seekMs)
-                                viewModel.seek(to: segment.endTicks)
+                                avPlayer.seek(to: seekMs)
+                                vm.seek(to: segment.endTicks)
                             }
                             .padding(.trailing, 60)
-                            .padding(.bottom, viewModel.showUpNext ? 200 : 80)
+                            .padding(.bottom, vm.showUpNext ? 200 : 100)
                         }
                     }
                     .transition(.move(edge: .trailing).combined(with: .opacity))
-                    .animation(.easeInOut(duration: 0.3), value: viewModel.currentSegment?.id)
+                    .animation(.easeInOut(duration: 0.3), value: vm.currentSegment?.id)
                 }
 
-                // Up Next overlay (bottom-right corner)
-                if viewModel.showUpNext, let nextEp = viewModel.nextEpisode {
+                // Up Next overlay
+                if let vm = viewModel, vm.showUpNext, let nextEp = vm.nextEpisode {
                     VStack {
                         Spacer()
                         HStack {
                             Spacer()
                             UpNextOverlayView(
                                 episode: nextEp,
-                                countdown: viewModel.upNextCountdown,
+                                countdown: vm.upNextCountdown,
                                 onPlayNow: { playNextEpisode() },
-                                onDismiss: { viewModel.dismissUpNext() }
+                                onDismiss: { vm.dismissUpNext() }
                             )
                             .padding(.trailing, 60)
                             .padding(.bottom, 80)
                         }
                     }
-                    .animation(.easeInOut(duration: 0.4), value: viewModel.showUpNext)
+                    .animation(.easeInOut(duration: 0.4), value: vm.showUpNext)
                 }
-            } else {
-                LoadingView(message: "Preparing playback...")
             }
-        }
-        .onTapGesture {
-            viewModel?.toggleOverlay()
         }
         .task {
-            if viewModel == nil {
-                let vm = PlayerViewModel(itemId: itemId, client: jellyfinClient)
-                viewModel = vm
-                do {
-                    let streamURL = try await vm.loadPlaybackInfo()
-                    playerWrapper.audioSettings = audioSettings
-                    playerWrapper.playURL(streamURL)
-                    await vm.reportStart()
-
-                    // Load external subtitle streams into VLC
-                    for sub in vm.externalSubtitleURLs() {
-                        playerWrapper.loadExternalSubtitle(url: sub.url)
-                    }
-
-                    // Load media segments for skip intro/outro
-                    await vm.loadSegments()
-
-                    // Load the current item details and pre-fetch next episode
-                    if let item = try? await jellyfinClient.getItem(id: itemId) {
-                        currentItem = item
-                        await vm.loadNextEpisode(currentItem: item)
-                    }
-                } catch {
-                    vm.error = "Failed to load playback info: \(error.localizedDescription)"
-                }
-            }
+            await loadAndPlay()
         }
         .onDisappear {
-            Task {
-                await viewModel?.reportStop()
-            }
-            playerWrapper.stop()
-            router.dismissPlayer()
+            Task { await viewModel?.reportStop() }
+            avPlayer.stop()
         }
-        .onChange(of: viewModel?.currentTime) { _, _ in
-            viewModel?.checkSegmentOverlay()
-            viewModel?.checkUpNextTrigger()
+        .onChange(of: avPlayer.currentTimeMs) { _, newTime in
+            // Sync AVPlayer time back to viewModel for Up Next / Skip Intro checks
+            if let vm = viewModel {
+                vm.currentTime = newTime * 10_000 // convert ms to ticks
+                vm.duration = avPlayer.durationMs * 10_000
+                vm.checkSegmentOverlay()
+                vm.checkUpNextTrigger()
 
-            // Check if playback ended — auto-advance to next
-            if let vm = viewModel,
-               vm.duration > 0,
-               vm.currentTime >= vm.duration - 10_000_000, // within 1 second of end
-               vm.shouldAutoPlayNext,
-               vm.upNextDismissed || vm.upNextCountdown <= 0 {
-                playNextEpisode()
+                // Auto-advance at end
+                if vm.duration > 0,
+                   vm.currentTime >= vm.duration - 10_000_000,
+                   vm.shouldAutoPlayNext,
+                   vm.upNextDismissed || vm.upNextCountdown <= 0 {
+                    playNextEpisode()
+                }
             }
         }
         .navigationBarHidden(true)
         .persistentSystemOverlays(.hidden)
     }
 
+    // MARK: - Load & Play
+
+    private func loadAndPlay() async {
+        let vm = PlayerViewModel(itemId: itemId, client: jellyfinClient)
+        viewModel = vm
+
+        do {
+            let streamURL = try await vm.loadPlaybackInfo()
+
+            // Get resume position
+            let resumeTicks = currentItem?.userData?.playbackPositionTicks ?? 0
+
+            avPlayer.playURL(streamURL, startPositionTicks: resumeTicks)
+            isLoading = false
+
+            await vm.reportStart()
+            await vm.loadSegments()
+
+            if let item = try? await jellyfinClient.getItem(id: itemId) {
+                currentItem = item
+                await vm.loadNextEpisode(currentItem: item)
+
+                // Resume from saved position
+                if let ticks = item.userData?.playbackPositionTicks, ticks > 0 {
+                    avPlayer.playURL(streamURL, startPositionTicks: ticks)
+                }
+            }
+        } catch {
+            loadError = error.localizedDescription
+            isLoading = false
+        }
+    }
+
     // MARK: - Next Episode
 
     private func playNextEpisode() {
         guard let nextEp = viewModel?.nextEpisode else { return }
-
-        // Stop current playback
         Task { await viewModel?.reportStop() }
-        playerWrapper.stop()
+        avPlayer.stop()
         viewModel?.resetUpNextState()
-
-        // Navigate to next episode
-        router.navigate(to: .player(itemId: nextEp.id))
+        router.dismissPlayer()
+        // Small delay then launch next
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            router.navigate(to: .player(itemId: nextEp.id))
+        }
     }
-}
-
-// MARK: - Preview
-
-#Preview {
-    PlayerView(itemId: "test-item")
 }
