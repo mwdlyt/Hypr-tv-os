@@ -1,6 +1,7 @@
 import SwiftUI
 
 /// Displays an error message with an optional retry action.
+/// Always focusable so tvOS remote can interact with it.
 struct ErrorView: View {
 
     let message: String
@@ -30,15 +31,8 @@ struct ErrorView: View {
                 .buttonStyle(.card)
             }
         }
+        .focusable()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
-    }
-}
-
-// MARK: - Preview
-
-#Preview {
-    ErrorView(message: "Could not connect to server.") {
-        print("Retry tapped")
     }
 }
