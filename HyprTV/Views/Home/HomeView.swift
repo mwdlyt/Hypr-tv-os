@@ -46,7 +46,7 @@ struct HomeView: View {
             // Load a default backdrop from the first available item on launch
             if isEmpty == false, currentBackdrop == nil {
                 if let firstItem = viewModel?.sections.first?.items.first {
-                    loadBackdrop(for: firstItem)
+                    Task { await loadBackdrop(for: firstItem) }
                 }
             }
         }
@@ -118,37 +118,48 @@ struct HomeView: View {
         .animation(.easeInOut(duration: 0.5), value: showCurrent)
     }
 
+    /// Debounce task — cancelled on every focus change so only the last one fires.
+    @State private var backdropDebounceTask: Task<Void, Never>?
+
     // MARK: - Focus Handling
 
     private func handleFocusChange(_ item: MediaItemDTO?) {
         guard let item, item.id != focusedItem?.id else { return }
         focusedItem = item
-        loadBackdrop(for: item)
+
+        // Cancel any pending backdrop load — only load after user settles on an item
+        backdropDebounceTask?.cancel()
+        backdropDebounceTask = Task {
+            // Wait 300ms — if user is still scrolling, this task gets cancelled
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard !Task.isCancelled else { return }
+            await loadBackdrop(for: item)
+        }
     }
 
-    private func loadBackdrop(for item: MediaItemDTO) {
+    private func loadBackdrop(for item: MediaItemDTO) async {
         // Build backdrop URL — fall back to series backdrop for episodes
         let itemId = item.type == .episode ? (item.seriesId ?? item.id) : item.id
         let tag = item.backdropImageTags?.first
 
+        // Use a lower resolution for backdrops — 960px is enough for a blurred background
         guard let url = jellyfinClient.imageURL(
             itemId: itemId,
             imageType: "Backdrop",
-            maxWidth: Constants.Images.backdropMaxWidth,
+            maxWidth: 960,
             tag: tag
         ) else { return }
 
-        Task {
-            guard let loaded = await ImageLoader.shared.loadImage(from: url) else { return }
+        guard let loaded = await ImageLoader.shared.loadImage(from: url) else { return }
+        guard !Task.isCancelled else { return }
 
-            await MainActor.run {
-                previousBackdrop = currentBackdrop
-                showCurrent = false
+        await MainActor.run {
+            previousBackdrop = currentBackdrop
+            showCurrent = false
 
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                    currentBackdrop = loaded
-                    showCurrent = true
-                }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                currentBackdrop = loaded
+                showCurrent = true
             }
         }
     }

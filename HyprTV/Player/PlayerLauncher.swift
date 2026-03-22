@@ -35,12 +35,29 @@ final class PlayerLauncher: NSObject {
                     return
                 }
 
-                guard let streamURL = client.streamURL(itemId: itemId, mediaSourceId: source.id, playSessionId: response.playSessionId) else {
-                    logger.error("Could not build stream URL for \(itemId)")
-                    return
+                // Use the server-provided TranscodingUrl if available (means we need transcoding).
+                // Otherwise fall back to our built stream URL (direct stream).
+                let streamURL: URL
+                if let transcodingPath = source.transcodingUrl,
+                   let base = client.baseURL {
+                    // TranscodingUrl is a relative path — prepend the server base URL
+                    guard let fullURL = URL(string: transcodingPath, relativeTo: base) else {
+                        logger.error("Invalid transcoding URL: \(transcodingPath)")
+                        return
+                    }
+                    streamURL = fullURL.absoluteURL
+                    logger.info("Using server TranscodingUrl (transcode/remux)")
+                } else {
+                    // Direct play — use our stream URL builder
+                    guard let url = client.streamURL(itemId: itemId, mediaSourceId: source.id, playSessionId: response.playSessionId) else {
+                        logger.error("Could not build stream URL for \(itemId)")
+                        return
+                    }
+                    streamURL = url
+                    logger.info("Using direct stream URL")
                 }
 
-                logger.info("Stream URL: \(streamURL.absoluteString)")
+                logger.info("Stream URL: \(streamURL.absoluteString.prefix(200))")
 
                 // 3. Create AVPlayer
                 let asset = AVURLAsset(url: streamURL)

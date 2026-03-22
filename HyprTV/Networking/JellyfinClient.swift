@@ -300,7 +300,81 @@ final class JellyfinClient {
     /// Retrieves available media sources and a play session ID for a given item.
     func getPlaybackInfo(itemId: String) async throws -> PlaybackInfoResponse {
         guard let userId else { throw JellyfinError.notAuthenticated }
-        return try await request(.playbackInfo(userId: userId, itemId: itemId))
+
+        // Send a DeviceProfile so Jellyfin knows what we can play natively.
+        // This makes Jellyfin return a TranscodingUrl for incompatible streams.
+        let profile = appleTV4KDeviceProfile()
+        let body = try JSONSerialization.data(withJSONObject: ["DeviceProfile": profile])
+        return try await request(.playbackInfo(userId: userId, itemId: itemId), body: body)
+    }
+
+    /// Device profile describing what Apple TV 4K can play natively via AVPlayer.
+    /// Jellyfin uses this to decide: direct play, remux, or transcode.
+    private func appleTV4KDeviceProfile() -> [String: Any] {
+        return [
+            "MaxStreamingBitrate": 120_000_000,
+            "MusicStreamingTranscodingBitrate": 384_000,
+
+            // What we can play directly (no server processing)
+            "DirectPlayProfiles": [
+                // MP4/MOV with HEVC/H.264 video + AAC/AC3/EAC3/FLAC/ALAC audio
+                [
+                    "Container": "mp4,m4v,mov",
+                    "Type": "Video",
+                    "VideoCodec": "hevc,h264,av1",
+                    "AudioCodec": "aac,ac3,eac3,flac,alac,mp3"
+                ]
+            ],
+
+            // How to transcode when direct play isn't possible
+            "TranscodingProfiles": [
+                [
+                    "Container": "ts",
+                    "Type": "Video",
+                    "VideoCodec": "hevc,h264",
+                    "AudioCodec": "aac,ac3,eac3",
+                    "Protocol": "hls",
+                    "Context": "Streaming",
+                    "MaxAudioChannels": "6",
+                    "MinSegments": "2",
+                    "BreakOnNonKeyFrames": true,
+                    "EnableSubtitlesInManifest": false
+                ]
+            ],
+
+            // Video codec constraints
+            "CodecProfiles": [
+                [
+                    "Type": "Video",
+                    "Codec": "hevc",
+                    "Conditions": [
+                        ["Condition": "LessThanEqual", "Property": "VideoBitDepth", "Value": "10", "IsRequired": false]
+                    ]
+                ],
+                [
+                    "Type": "Video",
+                    "Codec": "h264",
+                    "Conditions": [
+                        ["Condition": "LessThanEqual", "Property": "VideoBitDepth", "Value": "8", "IsRequired": false],
+                        ["Condition": "LessThanEqual", "Property": "VideoLevel", "Value": "52", "IsRequired": false]
+                    ]
+                ]
+            ],
+
+            // Subtitle handling
+            "SubtitleProfiles": [
+                ["Format": "vtt", "Method": "External"],
+                ["Format": "srt", "Method": "External"],
+                ["Format": "ass", "Method": "Encode"],
+                ["Format": "ssa", "Method": "Encode"],
+                ["Format": "pgs", "Method": "Encode"],
+                ["Format": "pgssub", "Method": "Encode"],
+                ["Format": "dvdsub", "Method": "Encode"],
+                ["Format": "sub", "Method": "Encode"]
+            ],
+
+            "ContainerProfiles": [] as [[String: Any]]
+        ]
     }
 
     /// Notifies the server that playback has started.
