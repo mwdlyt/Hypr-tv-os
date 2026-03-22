@@ -326,19 +326,23 @@ final class JellyfinClient {
                 ]
             ],
 
-            // How to transcode when direct play isn't possible
+            // How to transcode when direct play isn't possible.
+            // IMPORTANT: Use H.264 only for transcoding — HEVC in TS segments with HDR/DV
+            // causes black video on AVPlayer. H.264 SDR is universally compatible.
             "TranscodingProfiles": [
                 [
                     "Container": "ts",
                     "Type": "Video",
-                    "VideoCodec": "hevc,h264",
+                    "VideoCodec": "h264",
                     "AudioCodec": "aac,ac3,eac3",
                     "Protocol": "hls",
                     "Context": "Streaming",
                     "MaxAudioChannels": "6",
                     "MinSegments": "2",
                     "BreakOnNonKeyFrames": true,
-                    "EnableSubtitlesInManifest": false
+                    "EnableSubtitlesInManifest": false,
+                    "MaxWidth": 1920,
+                    "MaxHeight": 1080
                 ]
             ],
 

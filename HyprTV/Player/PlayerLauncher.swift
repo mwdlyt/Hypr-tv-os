@@ -4,7 +4,6 @@ import os
 
 /// Presents AVPlayerViewController using native UIKit modal presentation.
 /// This is the ONLY way to get proper rendering + Siri Remote controls on tvOS.
-/// SwiftUI fullScreenCover/ZStack approaches don't work for AVPlayerViewController.
 @MainActor
 final class PlayerLauncher: NSObject {
 
@@ -25,86 +24,62 @@ final class PlayerLauncher: NSObject {
 
         Task { @MainActor in
             do {
-                // 1. Get item details for metadata
                 let item = try? await client.getItem(id: itemId)
 
-                // 2. Get playback info and stream URL
                 let response = try await client.getPlaybackInfo(itemId: itemId)
                 guard let source = response.mediaSources.first else {
                     logger.error("No media source found for \(itemId)")
                     return
                 }
 
-                // Use the server-provided TranscodingUrl if available (means we need transcoding).
-                // Otherwise fall back to our built stream URL (direct stream).
-                let streamURL: URL
-                if let transcodingPath = source.transcodingUrl,
-                   let base = client.baseURL {
-                    // TranscodingUrl is a relative path — prepend the server base URL
-                    guard let fullURL = URL(string: transcodingPath, relativeTo: base) else {
-                        logger.error("Invalid transcoding URL: \(transcodingPath)")
-                        return
-                    }
-                    streamURL = fullURL.absoluteURL
-                    logger.info("Using server TranscodingUrl (transcode/remux)")
-                } else {
-                    // Direct play — use our stream URL builder
-                    guard let url = client.streamURL(itemId: itemId, mediaSourceId: source.id, playSessionId: response.playSessionId) else {
-                        logger.error("Could not build stream URL for \(itemId)")
-                        return
-                    }
-                    streamURL = url
-                    logger.info("Using direct stream URL")
+                let streamURL = buildStreamURL(
+                    source: source,
+                    itemId: itemId,
+                    playSessionId: response.playSessionId,
+                    client: client
+                )
+
+                guard let streamURL else {
+                    logger.error("Could not determine stream URL for \(itemId)")
+                    return
                 }
 
-                logger.info("Stream URL: \(streamURL.absoluteString.prefix(200))")
+                logger.info("Playing: \(item?.name ?? itemId)")
+                logger.info("Container: \(source.container ?? "?")")
+                logger.info("Stream URL: \(streamURL.absoluteString.prefix(150))")
 
-                // 3. Create AVPlayer
+                // Create AVPlayer with the stream URL
                 let asset = AVURLAsset(url: streamURL)
                 let playerItem = AVPlayerItem(asset: asset)
 
                 // Set metadata for native transport bar
                 var metadata: [AVMetadataItem] = []
-
                 if let name = item?.name {
                     let titleItem = AVMutableMetadataItem()
                     titleItem.identifier = .commonIdentifierTitle
                     titleItem.value = name as NSString
                     metadata.append(titleItem)
                 }
-
-                // Build subtitle: "S1:E5 · Episode Name" or "2024 · PG-13"
-                var subtitleParts: [String] = []
-                if let item, item.type == .episode {
-                    if let season = item.parentIndexNumber, let episode = item.indexNumber {
-                        subtitleParts.append("S\(season):E\(episode)")
-                    }
-                    if let seriesName = item.seriesName {
-                        subtitleParts.append(seriesName)
-                    }
-                } else {
-                    if let year = item?.productionYear { subtitleParts.append(String(year)) }
-                    if let rating = item?.officialRating { subtitleParts.append(rating) }
-                }
-
-                if !subtitleParts.isEmpty {
-                    let descItem = AVMutableMetadataItem()
-                    descItem.identifier = .commonIdentifierDescription
-                    descItem.value = subtitleParts.joined(separator: " · ") as NSString
-                    metadata.append(descItem)
-                }
-
                 playerItem.externalMetadata = metadata
 
                 let player = AVPlayer(playerItem: playerItem)
 
-                // 4. Resume from saved position
+                // Observe for errors
+                let errorObserver = playerItem.observe(\.status) { item, _ in
+                    if item.status == .failed {
+                        print("❌ AVPlayerItem FAILED: \(item.error?.localizedDescription ?? "unknown")")
+                    } else if item.status == .readyToPlay {
+                        print("✅ AVPlayerItem ready to play")
+                    }
+                }
+
+                // Resume from saved position
                 if let ticks = item?.userData?.playbackPositionTicks, ticks > 0 {
                     let seconds = Double(ticks) / 10_000_000.0
                     await player.seek(to: CMTime(seconds: seconds, preferredTimescale: 1000))
                 }
 
-                // 5. Present AVPlayerViewController natively
+                // Present AVPlayerViewController
                 let vc = AVPlayerViewController()
                 vc.player = player
                 vc.showsPlaybackControls = true
@@ -119,23 +94,73 @@ final class PlayerLauncher: NSObject {
                 vc.modalPresentationStyle = .fullScreen
                 rootVC.present(vc, animated: true) {
                     player.play()
-                    self.logger.info("Player presented — playing \(item?.name ?? itemId)")
+                    self.logger.info("Player presented — playback started")
                 }
 
-                // 6. Report playback start to Jellyfin
+                // Report playback start
                 try? await client.reportPlaybackStart(
                     itemId: itemId,
                     mediaSourceId: source.id,
                     playSessionId: response.playSessionId
                 )
 
-                // 7. Monitor for dismissal (Menu button)
-                self.startDismissMonitor(itemId: itemId, client: client, playSessionId: response.playSessionId)
+                // Monitor for dismissal
+                self.startDismissMonitor(
+                    itemId: itemId,
+                    client: client,
+                    playSessionId: response.playSessionId
+                )
+
+                // Hold error observer reference
+                withExtendedLifetime(errorObserver) {}
 
             } catch {
                 logger.error("Failed to launch player: \(error.localizedDescription)")
             }
         }
+    }
+
+    // MARK: - Stream URL Selection
+
+    /// Determines the best stream URL based on what Jellyfin reports.
+    /// Priority: TranscodingUrl (Jellyfin decided) > Direct Stream > Fallback HLS
+    private func buildStreamURL(
+        source: MediaSourceDTO,
+        itemId: String,
+        playSessionId: String?,
+        client: JellyfinClient
+    ) -> URL? {
+        guard let baseURL = client.baseURL else { return nil }
+
+        // Option 1: Server provided a transcoding URL — use it.
+        // This means Jellyfin decided the content needs transcoding/remuxing.
+        if let transcodingPath = source.transcodingUrl, !transcodingPath.isEmpty {
+            if let url = URL(string: transcodingPath, relativeTo: baseURL) {
+                logger.info("Using TranscodingUrl from server")
+                return url.absoluteURL
+            }
+        }
+
+        // Option 2: Content can be direct streamed.
+        // For MP4/MOV containers with compatible codecs, just stream the file.
+        let container = source.container?.lowercased() ?? ""
+        if ["mp4", "m4v", "mov"].contains(where: { container.contains($0) }) {
+            if let token = client.accessToken {
+                var components = URLComponents(url: baseURL.appendingPathComponent("/Videos/\(itemId)/stream"), resolvingAgainstBaseURL: false)
+                components?.queryItems = [
+                    URLQueryItem(name: "static", value: "true"),
+                    URLQueryItem(name: "api_key", value: token),
+                    URLQueryItem(name: "MediaSourceId", value: source.id)
+                ]
+                if let url = components?.url {
+                    logger.info("Using direct static stream (compatible container: \(container))")
+                    return url
+                }
+            }
+        }
+
+        // Option 3: Fallback to our HLS URL builder
+        return client.streamURL(itemId: itemId, mediaSourceId: source.id, playSessionId: playSessionId)
     }
 
     /// Dismiss the player programmatically.
@@ -148,7 +173,6 @@ final class PlayerLauncher: NSObject {
 
     // MARK: - Private
 
-    /// Polls to detect when AVPlayerViewController is dismissed via Menu button.
     private func startDismissMonitor(itemId: String, client: JellyfinClient, playSessionId: String?) {
         dismissCheckTask?.cancel()
         dismissCheckTask = Task { @MainActor [weak self] in
@@ -156,9 +180,7 @@ final class PlayerLauncher: NSObject {
                 try? await Task.sleep(nanoseconds: 500_000_000)
                 guard let self, let vc = self.playerVC else { break }
 
-                // Check if the VC has been dismissed
                 if vc.presentingViewController == nil && vc.view.window == nil {
-                    // Report stop position to Jellyfin
                     let positionTicks = Int64((vc.player?.currentTime().seconds ?? 0) * 10_000_000)
                     try? await client.reportPlaybackStopped(
                         itemId: itemId,

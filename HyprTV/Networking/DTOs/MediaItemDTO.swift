@@ -172,9 +172,15 @@ struct MediaSourceDTO: Codable, Hashable {
     let size: Int64?
     /// Overall bitrate in bits per second.
     let bitrate: Int?
+    /// Whether the server says this source can be played directly.
+    let supportsDirectPlay: Bool?
+    /// Whether the server says this source can be direct streamed (remuxed).
+    let supportsDirectStream: Bool?
+    /// Whether the server says transcoding is available.
+    let supportsTranscoding: Bool?
     /// URL for direct stream playback (no transcoding).
     let directPlayUrl: String?
-    /// URL for server-side transcoded stream.
+    /// URL for server-side transcoded stream (set when transcoding is needed).
     let transcodingUrl: String?
     /// Audio, video, and subtitle streams within this source.
     let mediaStreams: [MediaStreamDTO]?
@@ -186,6 +192,9 @@ struct MediaSourceDTO: Codable, Hashable {
         case container = "Container"
         case size = "Size"
         case bitrate = "Bitrate"
+        case supportsDirectPlay = "SupportsDirectPlay"
+        case supportsDirectStream = "SupportsDirectStream"
+        case supportsTranscoding = "SupportsTranscoding"
         case directPlayUrl = "DirectStreamUrl"
         case transcodingUrl = "TranscodingUrl"
         case mediaStreams = "MediaStreams"
