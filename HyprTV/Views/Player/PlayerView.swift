@@ -56,7 +56,11 @@ struct PlayerView: View {
                 // Native AVPlayer view controller
                 AVPlayerRepresentable(
                     player: avPlayer.player,
+                    title: currentItem?.name ?? "",
+                    subtitle: mediaSubtitle,
                     onDismiss: {
+                        Task { await viewModel?.reportStop() }
+                        avPlayer.stop()
                         router.dismissPlayer()
                     }
                 )
@@ -129,6 +133,16 @@ struct PlayerView: View {
         .persistentSystemOverlays(.hidden)
     }
 
+    private var mediaSubtitle: String {
+        var parts: [String] = []
+        if let year = currentItem?.productionYear { parts.append(String(year)) }
+        if let rating = currentItem?.officialRating { parts.append(rating) }
+        if let genres = currentItem?.genres, !genres.isEmpty {
+            parts.append(genres.prefix(2).joined(separator: ", "))
+        }
+        return parts.joined(separator: " · ")
+    }
+
     // MARK: - Load & Play
 
     private func loadAndPlay() async {
@@ -136,25 +150,27 @@ struct PlayerView: View {
         viewModel = vm
 
         do {
+            // Fetch item details first for metadata
+            if let item = try? await jellyfinClient.getItem(id: itemId) {
+                currentItem = item
+            }
+
             let streamURL = try await vm.loadPlaybackInfo()
 
-            // Get resume position
-            let resumeTicks = currentItem?.userData?.playbackPositionTicks ?? 0
+            // Set metadata for native transport bar
+            avPlayer.mediaTitle = currentItem?.name ?? ""
+            avPlayer.mediaSubtitle = mediaSubtitle
 
+            // Resume from saved position
+            let resumeTicks = currentItem?.userData?.playbackPositionTicks ?? 0
             avPlayer.playURL(streamURL, startPositionTicks: resumeTicks)
             isLoading = false
 
             await vm.reportStart()
             await vm.loadSegments()
 
-            if let item = try? await jellyfinClient.getItem(id: itemId) {
-                currentItem = item
+            if let item = currentItem {
                 await vm.loadNextEpisode(currentItem: item)
-
-                // Resume from saved position
-                if let ticks = item.userData?.playbackPositionTicks, ticks > 0 {
-                    avPlayer.playURL(streamURL, startPositionTicks: ticks)
-                }
             }
         } catch {
             loadError = error.localizedDescription

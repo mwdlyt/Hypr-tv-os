@@ -35,11 +35,20 @@ final class AVPlayerWrapper: NSObject {
 
     // MARK: - Playback
 
+    /// Metadata to display in the native transport bar.
+    var mediaTitle: String = ""
+    var mediaSubtitle: String = ""
+
     func playURL(_ url: URL, startPositionTicks: Int64 = 0) {
-        // Create asset with custom headers for Jellyfin auth
+        // Stop any existing playback first
+        stop()
+
         let asset = AVURLAsset(url: url)
         let item = AVPlayerItem(asset: asset)
         self.playerItem = item
+
+        // Set metadata for native transport bar
+        setNowPlayingMetadata(on: item)
 
         // Observe status
         statusObserver = item.observe(\.status, options: [.new]) { [weak self] item, _ in
@@ -157,6 +166,28 @@ final class AVPlayerWrapper: NSObject {
         currentTimeMs = 0
         durationMs = 0
         progress = 0
+    }
+
+    // MARK: - Metadata
+
+    private func setNowPlayingMetadata(on item: AVPlayerItem) {
+        var metadata: [AVMetadataItem] = []
+
+        if !mediaTitle.isEmpty {
+            let titleItem = AVMutableMetadataItem()
+            titleItem.identifier = .commonIdentifierTitle
+            titleItem.value = mediaTitle as NSString
+            metadata.append(titleItem)
+        }
+
+        if !mediaSubtitle.isEmpty {
+            let descItem = AVMutableMetadataItem()
+            descItem.identifier = .commonIdentifierDescription
+            descItem.value = mediaSubtitle as NSString
+            metadata.append(descItem)
+        }
+
+        item.externalMetadata = metadata
     }
 
     // MARK: - Audio/Subtitle Selection
