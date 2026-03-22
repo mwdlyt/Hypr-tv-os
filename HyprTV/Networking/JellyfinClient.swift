@@ -471,13 +471,22 @@ final class JellyfinClient {
     }
 
     /// Constructs a direct stream URL for playback with authentication baked in.
+    /// Returns an HLS master playlist URL for the given item.
+    /// Jellyfin will transcode if needed (MKV → HLS) or direct-stream compatible formats.
     func streamURL(itemId: String, mediaSourceId: String? = nil) -> URL? {
-        guard let baseURL, let token = accessToken else { return nil }
+        guard let baseURL, let token = accessToken, let userId else { return nil }
 
-        var components = URLComponents(url: baseURL.appendingPathComponent("/Videos/\(itemId)/stream"), resolvingAgainstBaseURL: false)
+        var components = URLComponents(url: baseURL.appendingPathComponent("/Videos/\(itemId)/master.m3u8"), resolvingAgainstBaseURL: false)
         var queryItems = [
-            URLQueryItem(name: "static", value: "true"),
-            URLQueryItem(name: "api_key", value: token)
+            URLQueryItem(name: "api_key", value: token),
+            URLQueryItem(name: "DeviceId", value: deviceId),
+            URLQueryItem(name: "VideoCodec", value: "h264,hevc"),
+            URLQueryItem(name: "AudioCodec", value: "aac,ac3,eac3"),
+            URLQueryItem(name: "TranscodingMaxAudioChannels", value: "6"),
+            URLQueryItem(name: "SegmentContainer", value: "ts"),
+            URLQueryItem(name: "MinSegments", value: "1"),
+            URLQueryItem(name: "BreakOnNonKeyFrames", value: "true"),
+            URLQueryItem(name: "TranscodeReasons", value: "ContainerNotSupported"),
         ]
         if let mediaSourceId {
             queryItems.append(URLQueryItem(name: "MediaSourceId", value: mediaSourceId))

@@ -1,29 +1,26 @@
 import SwiftUI
 import AVKit
 
-/// Triggers AVPlayerViewController presentation modally via fullScreenCover.
-/// This is how tvOS expects video players to work — modal presentation gives us
-/// native Siri Remote controls, proper Menu button behavior, and correct rendering.
+/// PlayerView acts as a loading/error screen while preparing playback.
+/// Once the stream URL is ready, it hands off to PlayerLauncher which
+/// presents AVPlayerViewController natively via UIKit modal.
 struct PlayerView: View {
 
     let itemId: String
 
     @Environment(JellyfinClient.self) private var jellyfinClient
     @Environment(AppRouter.self) private var router
-    @State private var avPlayer = AVPlayerWrapper()
     @State private var viewModel: PlayerViewModel?
     @State private var currentItem: MediaItemDTO?
     @State private var isLoading = true
     @State private var loadError: String?
-    @State private var showPlayer = false
+    @State private var launched = false
 
     var body: some View {
         ZStack {
-            // Transparent background — the real UI is the fullScreenCover
             Color.black.ignoresSafeArea()
 
             if let loadError {
-                // Error state — focusable so remote works
                 VStack(spacing: 20) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.system(size: 48))
@@ -42,32 +39,25 @@ struct PlayerView: View {
                     .buttonStyle(.card)
                     .padding(.top, 10)
                 }
+                .focusable()
             } else if isLoading {
                 VStack(spacing: 16) {
                     ProgressView()
                         .scaleEffect(1.5)
-                    Text("Preparing playback...")
+                    Text("Loading media...")
                         .font(.title3)
                         .foregroundStyle(.secondary)
                 }
+                .focusable()
             }
         }
         .onExitCommand {
+            // Menu button on loading/error screens
             router.dismissPlayer()
         }
         .task {
+            guard !launched else { return }
             await loadAndPlay()
-        }
-        .fullScreenCover(isPresented: $showPlayer) {
-            // When dismissed (Menu button), clean up
-            Task { await viewModel?.reportStop() }
-            avPlayer.stop()
-            router.dismissPlayer()
-        } content: {
-            AVPlayerViewWrapper(player: avPlayer.player, onDone: {
-                showPlayer = false
-            })
-            .ignoresSafeArea()
         }
     }
 
@@ -78,74 +68,45 @@ struct PlayerView: View {
         viewModel = vm
 
         do {
+            // Fetch item details for metadata
             if let item = try? await jellyfinClient.getItem(id: itemId) {
                 currentItem = item
             }
 
             let streamURL = try await vm.loadPlaybackInfo()
 
-            // Set metadata
-            avPlayer.mediaTitle = currentItem?.name ?? ""
-            var parts: [String] = []
-            if let year = currentItem?.productionYear { parts.append(String(year)) }
-            if let rating = currentItem?.officialRating { parts.append(rating) }
-            avPlayer.mediaSubtitle = parts.joined(separator: " · ")
+            // Create AVPlayer with the HLS URL
+            let asset = AVURLAsset(url: streamURL)
+            let playerItem = AVPlayerItem(asset: asset)
+            let player = AVPlayer(playerItem: playerItem)
 
-            // Resume from saved position
-            let resumeTicks = currentItem?.userData?.playbackPositionTicks ?? 0
-            avPlayer.playURL(streamURL, startPositionTicks: resumeTicks)
-
-            isLoading = false
-            showPlayer = true
-
-            await vm.reportStart()
-            await vm.loadSegments()
-
-            if let item = currentItem {
-                await vm.loadNextEpisode(currentItem: item)
+            // Seek to resume position if needed
+            if let ticks = currentItem?.userData?.playbackPositionTicks, ticks > 0 {
+                let seconds = Double(ticks) / 10_000_000.0
+                await player.seek(to: CMTime(seconds: seconds, preferredTimescale: 1000))
             }
+
+            launched = true
+            isLoading = false
+
+            // Present the native player via UIKit
+            await PlayerLauncher.shared.present(
+                player: player,
+                title: currentItem?.name
+            ) {
+                // Called when player is dismissed (Menu button)
+                Task { @MainActor in
+                    await vm.reportStop()
+                    router.dismissPlayer()
+                }
+            }
+
+            // Report playback started to Jellyfin
+            await vm.reportStart()
+
         } catch {
             loadError = error.localizedDescription
             isLoading = false
-        }
-    }
-}
-
-/// Simple wrapper that creates and presents a native AVPlayerViewController.
-/// This is the proper tvOS way — presented modally via fullScreenCover.
-struct AVPlayerViewWrapper: UIViewControllerRepresentable {
-    let player: AVPlayer
-    var onDone: (() -> Void)?
-
-    func makeUIViewController(context: Context) -> AVPlayerViewController {
-        let vc = AVPlayerViewController()
-        vc.player = player
-        vc.showsPlaybackControls = true
-        vc.delegate = context.coordinator
-        return vc
-    }
-
-    func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {
-        // Player is already set
-    }
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(onDone: onDone)
-    }
-
-    class Coordinator: NSObject, AVPlayerViewControllerDelegate {
-        let onDone: (() -> Void)?
-
-        init(onDone: (() -> Void)?) {
-            self.onDone = onDone
-        }
-
-        func playerViewControllerShouldDismiss(_ playerViewController: AVPlayerViewController) -> Bool {
-            return true
-        }
-
-        func playerViewControllerDidEndDismissalTransition(_ playerViewController: AVPlayerViewController) {
-            onDone?()
         }
     }
 }

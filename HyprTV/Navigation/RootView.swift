@@ -9,19 +9,17 @@ struct RootView: View {
 
         Group {
             if jellyfinClient.isAuthenticated {
-                mainTabView
-                    // Player is presented as a fullScreenCover from the tab view
-                    .fullScreenCover(item: Binding(
-                        get: { router.nowPlayingItemId.map { PlayerItemID(id: $0) } },
-                        set: { newValue in
-                            if newValue == nil {
-                                router.nowPlayingItemId = nil
-                            }
-                        }
-                    )) { item in
-                        PlayerView(itemId: item.id)
+                ZStack {
+                    mainTabView
+
+                    // Thin PlayerView layer handles loading/errors and launches UIKit player
+                    if let playingItemId = router.nowPlayingItemId {
+                        PlayerView(itemId: playingItemId)
                             .ignoresSafeArea()
+                            .zIndex(100)
                     }
+                }
+                .animation(.easeInOut(duration: 0.2), value: router.nowPlayingItemId)
             } else {
                 ServerConnectionView()
             }
@@ -81,9 +79,4 @@ struct RootView: View {
             SettingsView()
         }
     }
-}
-
-/// Identifiable wrapper for player item ID (needed for fullScreenCover item binding).
-struct PlayerItemID: Identifiable {
-    let id: String
 }

@@ -70,6 +70,7 @@
 		CEAE5F909930B75E8A950233 /* PlaybackInfoDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFFB3112650BF1D938AC4A6C /* PlaybackInfoDTO.swift */; };
 		D0EC6F82FB644A6055858E97 /* View+TVFocus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 515CAEB11E410FBE93D7DC7D /* View+TVFocus.swift */; };
 		D4F85C663104BB8A7326840E /* LoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CA85248227332F356F5BF00 /* LoadingView.swift */; };
+		D740120260D7A329991281BC /* PlayerLauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23675756667E7CBC6400E705 /* PlayerLauncher.swift */; };
 		D8404F90EA5D557C9A8FCFA6 /* PlayerOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F533CCB536085682994E92C /* PlayerOverlayView.swift */; };
 		DFEFBE7B5B971FAB619BA371 /* GenreTagsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6ECEDD73F7BEC5966B16CDAE /* GenreTagsView.swift */; };
 		E181E055B19C60403496C952 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B93C12D8C2A68137B2DE0215 /* Assets.xcassets */; };
@@ -95,6 +96,7 @@
 		133C8B34D769982E97B2DFED /* MediaSegment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaSegment.swift; sourceTree = "<group>"; };
 		214E63C349516B3C45B79C2D /* AVPlayerWrapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AVPlayerWrapper.swift; sourceTree = "<group>"; };
 		22D7619759BD1C4F995B4C4D /* JellyfinClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JellyfinClient.swift; sourceTree = "<group>"; };
+		23675756667E7CBC6400E705 /* PlayerLauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerLauncher.swift; sourceTree = "<group>"; };
 		23686ECC94C8018CD10CA36A /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
 		2560BCDF9E29C16AF43B9798 /* LibraryDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryDTO.swift; sourceTree = "<group>"; };
 		2BC25637A1CE976AE903777D /* AppRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRouter.swift; sourceTree = "<group>"; };
@@ -221,6 +223,7 @@
 				4699B2DA87495FE78E7A1130 /* AVPlayerRepresentable.swift */,
 				214E63C349516B3C45B79C2D /* AVPlayerWrapper.swift */,
 				BEA241D1160B2109BEFD113D /* PlaybackCoordinator.swift */,
+				23675756667E7CBC6400E705 /* PlayerLauncher.swift */,
 				9320CCC064AF2F933E901F2A /* PlayerRepresentable.swift */,
 				9FEC0E8E60918C58536DAD81 /* RemoteCommandHandler.swift */,
 				A256CC510FCF7B258DFBF70D /* VLCPlayerViewController.swift */,
@@ -519,6 +522,7 @@
 				8E2563173C9D141BB0605EE2 /* MediaSegment.swift in Sources */,
 				85DEC929F4E25F2B45E70770 /* PlaybackCoordinator.swift in Sources */,
 				CEAE5F909930B75E8A950233 /* PlaybackInfoDTO.swift in Sources */,
+				D740120260D7A329991281BC /* PlayerLauncher.swift in Sources */,
 				D8404F90EA5D557C9A8FCFA6 /* PlayerOverlayView.swift in Sources */,
 				0CA05762439A5A43C487408D /* PlayerRepresentable.swift in Sources */,
 				94C7B1C929B5327312E281EE /* PlayerView.swift in Sources */,
