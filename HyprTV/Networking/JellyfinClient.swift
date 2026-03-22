@@ -298,6 +298,24 @@ final class JellyfinClient {
     // MARK: - Playback
 
     /// Retrieves available media sources and a play session ID for a given item.
+    /// Gets the next episode to play for a series (next unwatched, or S1E1 if none watched).
+    func getNextUp(seriesId: String) async throws -> MediaItemDTO? {
+        guard let userId else { throw JellyfinError.notAuthenticated }
+        let response: ItemsResponse = try await request(.nextUp(userId: userId, seriesId: seriesId))
+        return response.items.first
+    }
+
+    /// Gets the first episode of a series (S1E1) as fallback when NextUp returns nothing.
+    func getFirstEpisode(seriesId: String) async throws -> MediaItemDTO? {
+        guard let userId else { throw JellyfinError.notAuthenticated }
+        // Get first season
+        let seasons: ItemsResponse = try await request(.seasons(userId: userId, seriesId: seriesId))
+        guard let firstSeason = seasons.items.first else { return nil }
+        // Get first episode of first season
+        let episodes: ItemsResponse = try await request(.episodes(userId: userId, seriesId: seriesId, seasonId: firstSeason.id))
+        return episodes.items.first
+    }
+
     func getPlaybackInfo(itemId: String) async throws -> PlaybackInfoResponse {
         guard let userId else { throw JellyfinError.notAuthenticated }
 

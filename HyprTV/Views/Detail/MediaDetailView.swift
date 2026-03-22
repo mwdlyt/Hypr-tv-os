@@ -225,13 +225,30 @@ struct MediaDetailView: View {
 
     // MARK: - Action Buttons
 
+    /// Resolves the correct playable item and starts playback.
+    /// For series: finds the next unwatched episode via NextUp API.
+    /// For movies/episodes: plays directly.
+    private func playItem(_ item: MediaItemDTO) async {
+        if item.type == .series {
+            // Get next unwatched episode
+            if let nextEp = try? await jellyfinClient.getNextUp(seriesId: item.id) {
+                router.navigate(to: .player(itemId: nextEp.id))
+            } else if let firstEp = try? await jellyfinClient.getFirstEpisode(seriesId: item.id) {
+                // Nothing in NextUp — play S1E1
+                router.navigate(to: .player(itemId: firstEp.id))
+            }
+        } else {
+            router.navigate(to: .player(itemId: item.id))
+        }
+    }
+
     private func actionButtons(item: MediaItemDTO, viewModel: MediaDetailViewModel) -> some View {
         HStack(spacing: 20) {
             // Play Button
             Button {
-                router.navigate(to: .player(itemId: item.id))
+                Task { await playItem(item) }
             } label: {
-                Label("Play", systemImage: "play.fill")
+                Label(item.type == .series ? "Play Next" : "Play", systemImage: "play.fill")
                     .font(.title3)
                     .fontWeight(.semibold)
                     .padding(.horizontal, 32)
@@ -239,8 +256,9 @@ struct MediaDetailView: View {
             }
             .buttonStyle(.card)
 
-            // Resume if applicable
-            if let userData = item.userData, userData.playbackPositionTicks > 0 {
+            // Resume if applicable (for movies/episodes with progress)
+            if item.type != .series,
+               let userData = item.userData, userData.playbackPositionTicks > 0 {
                 Button {
                     router.navigate(to: .player(itemId: item.id))
                 } label: {
