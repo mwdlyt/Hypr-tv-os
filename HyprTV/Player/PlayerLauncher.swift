@@ -1,16 +1,17 @@
-import AVKit
 import UIKit
 import os
 
-/// Presents AVPlayerViewController using native UIKit modal presentation.
-/// Handles audio track switching and subtitle loading.
+/// Presents VLCPlayerViewController using native UIKit modal presentation.
+/// Handles audio/subtitle track switching via VLCKit's native capabilities.
 @MainActor
 final class PlayerLauncher: NSObject {
 
     static let shared = PlayerLauncher()
     private let logger = Logger(subsystem: "com.hypr.tv", category: "PlayerLauncher")
 
-    private var playerVC: AVPlayerViewController?
+    private var playerVC: VLCPlayerViewController?
+    private var playerWrapper: VLCPlayerWrapper?
+    private var coordinator: PlaybackCoordinator?
     private var dismissCheckTask: Task<Void, Never>?
 
     // Current playback state (for track switching)
@@ -18,7 +19,6 @@ final class PlayerLauncher: NSObject {
     private var currentClient: JellyfinClient?
     private var currentSource: MediaSourceDTO?
     private var currentPlaySessionId: String?
-    private var currentAudioIndex: Int?
     private var audioTracks: [AudioTrack] = []
     private var subtitleTracks: [SubtitleTrack] = []
 
@@ -46,94 +46,84 @@ final class PlayerLauncher: NSObject {
                 audioTracks = MediaTrackParser.audioTracks(from: source.mediaStreams)
                 subtitleTracks = MediaTrackParser.subtitleTracks(from: source.mediaStreams)
 
-                // Find default audio index
-                let defaultAudioIndex = audioTracks.first(where: { $0.isDefault })?.id
-                    ?? audioTracks.first?.id ?? 1
-
-                // Store state for track switching
+                // Store state
                 currentItemId = itemId
                 currentClient = client
                 currentSource = source
                 currentPlaySessionId = response.playSessionId
-                currentAudioIndex = defaultAudioIndex
 
-                let streamURL = buildStreamURL(
-                    source: source,
+                // Build direct stream URL — VLC handles all containers and codecs natively
+                guard let streamURL = client.streamURL(
                     itemId: itemId,
-                    playSessionId: response.playSessionId,
-                    audioStreamIndex: defaultAudioIndex,
-                    client: client
-                )
-
-                guard let streamURL else {
+                    mediaSourceId: source.id,
+                    playSessionId: response.playSessionId
+                ) else {
                     logger.error("Could not determine stream URL for \(itemId)")
                     return
                 }
 
                 logger.info("Playing: \(item?.name ?? itemId)")
+                logger.info("Stream URL: \(streamURL.absoluteString, privacy: .private)")
                 logger.info("Audio tracks: \(self.audioTracks.count), Subtitle tracks: \(self.subtitleTracks.count)")
 
-                // Create player
-                let player = AVPlayer(url: streamURL)
+                // Create VLC player wrapper
+                let wrapper = VLCPlayerWrapper()
+                self.playerWrapper = wrapper
 
-                // Set metadata
-                var metadata: [AVMetadataItem] = []
-                if let name = item?.name {
-                    let titleItem = AVMutableMetadataItem()
-                    titleItem.identifier = .commonIdentifierTitle
-                    titleItem.value = name as NSString
-                    metadata.append(titleItem)
+                // Create VLC view controller
+                let vc = VLCPlayerViewController(playerWrapper: wrapper)
+                vc.onMenuPressed = { [weak self] in
+                    self?.dismiss()
                 }
-                player.currentItem?.externalMetadata = metadata
-
-                // Resume position
-                if let ticks = item?.userData?.playbackPositionTicks, ticks > 0 {
-                    let seconds = Double(ticks) / 10_000_000.0
-                    await player.seek(to: CMTime(seconds: seconds, preferredTimescale: 1000))
-                }
-
-                // Present player with custom info panel
-                let vc = AVPlayerViewController()
-                vc.player = player
-                vc.showsPlaybackControls = true
-
-                // Add custom info view controller for audio/subtitle selection
-                let infoVC = TrackSelectionViewController(
-                    audioTracks: audioTracks,
-                    subtitleTracks: subtitleTracks,
-                    currentAudioIndex: defaultAudioIndex,
-                    onAudioSelected: { [weak self] audioIndex in
-                        self?.switchAudioTrack(to: audioIndex)
-                    },
-                    onSubtitleSelected: { [weak self] subtitleIndex in
-                        self?.loadSubtitle(index: subtitleIndex)
-                    }
-                )
-                vc.customInfoViewController = infoVC
-
                 self.playerVC = vc
 
                 guard let rootVC = self.topViewController() else {
                     logger.error("No root view controller")
                     self.playerVC = nil
+                    self.playerWrapper = nil
                     return
                 }
 
                 vc.modalPresentationStyle = .fullScreen
-                rootVC.present(vc, animated: true) {
-                    player.play()
-                    self.logger.info("Player presented — playback started")
+                rootVC.present(vc, animated: true) { [weak self] in
+                    guard let self else { return }
+
+                    // Start playback
+                    wrapper.playURL(streamURL)
+
+                    // Resume position
+                    if let ticks = item?.userData?.playbackPositionTicks, ticks > 0 {
+                        let positionMs = ticks / 10_000  // ticks to milliseconds
+                        wrapper.seek(to: positionMs)
+                        self.logger.info("Resuming at \(positionMs)ms")
+                    }
+
+                    // Load external subtitles from Jellyfin
+                    self.loadExternalSubtitles(source: source, itemId: itemId, client: client, wrapper: wrapper)
+
+                    self.logger.info("VLC player presented — playback started")
                 }
 
+                // Set up PlaybackCoordinator
+                let coord = PlaybackCoordinator(client: client, itemId: itemId)
+                coord.setPlaySessionId(response.playSessionId)
+                self.coordinator = coord
+
                 // Report start
-                try? await client.reportPlaybackStart(
-                    itemId: itemId,
-                    mediaSourceId: source.id,
-                    playSessionId: response.playSessionId
+                await coord.reportStart()
+
+                // Start progress reporting
+                coord.startProgressReporting(
+                    positionProvider: { [weak wrapper] in
+                        wrapper?.currentTimeMs ?? 0
+                    },
+                    isPausedProvider: { [weak wrapper] in
+                        !(wrapper?.isPlaying ?? false)
+                    }
                 )
 
                 // Monitor dismiss
-                self.startDismissMonitor(itemId: itemId, client: client, playSessionId: response.playSessionId)
+                self.startDismissMonitor()
 
             } catch {
                 logger.error("Failed to launch: \(error.localizedDescription)")
@@ -143,176 +133,95 @@ final class PlayerLauncher: NSObject {
 
     // MARK: - Audio Track Switching
 
-    /// Switches the audio track by rebuilding the HLS stream URL with a different AudioStreamIndex.
-    /// Preserves the current playback position.
-    private func switchAudioTrack(to audioIndex: Int) {
-        guard let vc = playerVC,
-              let player = vc.player,
-              let itemId = currentItemId,
-              let client = currentClient,
-              let source = currentSource else { return }
+    /// Switches the audio track instantly via VLC — no URL rebuild needed.
+    func switchAudioTrack(to jellyfinIndex: Int) {
+        guard let wrapper = playerWrapper else { return }
 
-        // Save current position
-        let currentTime = player.currentTime()
-        currentAudioIndex = audioIndex
+        logger.info("Switching to audio track index \(jellyfinIndex)")
 
-        logger.info("Switching to audio track index \(audioIndex)")
-
-        // Build new URL with different audio index
-        guard let newURL = buildStreamURL(
-            source: source,
-            itemId: itemId,
-            playSessionId: currentPlaySessionId,
-            audioStreamIndex: audioIndex,
-            client: client
-        ) else { return }
-
-        // Replace the player item
-        let newItem = AVPlayerItem(url: newURL)
-        player.replaceCurrentItem(with: newItem)
-
-        // Seek to where we were
-        Task {
-            await player.seek(to: currentTime)
-            player.play()
+        // VLC audio track indices map to their internal order.
+        // Find the VLC track matching the Jellyfin stream index.
+        // VLC exposes tracks as (index, title) pairs. The VLC index for embedded
+        // streams typically starts at 1 (0 = "Disable"). We map Jellyfin stream
+        // indices to VLC track indices by matching order.
+        let vlcTracks = wrapper.audioTracks
+        if let match = vlcTracks.first(where: { $0.index == jellyfinIndex }) {
+            wrapper.setAudioTrack(index: match.index)
+        } else {
+            // Fallback: try using the Jellyfin index directly
+            wrapper.setAudioTrack(index: jellyfinIndex)
         }
     }
 
-    // MARK: - Subtitle Loading
+    // MARK: - Subtitle Track Switching
 
-    /// Loads an external subtitle track from Jellyfin and adds it to the player.
-    private func loadSubtitle(index: Int?) {
-        guard let vc = playerVC,
-              let player = vc.player,
-              let playerItem = player.currentItem,
-              let itemId = currentItemId,
-              let client = currentClient,
-              let source = currentSource else { return }
+    /// Switches subtitle track instantly via VLC — no URL rebuild needed.
+    func switchSubtitleTrack(to jellyfinIndex: Int?) {
+        guard let wrapper = playerWrapper else { return }
 
-        // index == nil means "Off"
-        guard let index else {
-            // Disable subtitles — select no legible option
-            if let group = playerItem.asset.mediaSelectionGroup(forMediaCharacteristic: .legible) {
-                playerItem.select(nil, in: group)
-            }
+        guard let jellyfinIndex else {
+            // Disable subtitles
+            wrapper.setSubtitleTrack(index: -1)
             logger.info("Subtitles disabled")
             return
         }
 
-        // Build subtitle URL
-        guard let subtitleURL = client.subtitleURL(
-            itemId: itemId,
-            mediaSourceId: source.id,
-            subtitleIndex: index
-        ) else { return }
+        logger.info("Switching to subtitle track index \(jellyfinIndex)")
 
-        logger.info("Loading subtitle index \(index) from \(subtitleURL)")
-
-        // Add as external subtitle
-        // AVPlayer supports adding VTT subtitles as supplementary content
-        Task {
-            // For HLS streams, we can't add external subtitles directly.
-            // Instead, we'll use the Jellyfin subtitle burn-in approach:
-            // Rebuild the HLS URL with SubtitleStreamIndex parameter
-            let currentTime = player.currentTime()
-
-            guard var newURL = buildStreamURL(
-                source: source,
-                itemId: itemId,
-                playSessionId: currentPlaySessionId,
-                audioStreamIndex: currentAudioIndex ?? 1,
-                subtitleStreamIndex: index,
-                client: client
-            ) else { return }
-
-            let newItem = AVPlayerItem(url: newURL)
-            player.replaceCurrentItem(with: newItem)
-            await player.seek(to: currentTime)
-            player.play()
-            logger.info("Subtitle track \(index) activated (burn-in)")
+        let vlcTracks = wrapper.subtitleTracks
+        if let match = vlcTracks.first(where: { $0.index == jellyfinIndex }) {
+            wrapper.setSubtitleTrack(index: match.index)
+        } else {
+            wrapper.setSubtitleTrack(index: jellyfinIndex)
         }
     }
 
-    // MARK: - Stream URL Building
+    // MARK: - External Subtitles
 
-    private func buildStreamURL(
+    /// Loads external subtitle streams from Jellyfin into VLC.
+    private func loadExternalSubtitles(
         source: MediaSourceDTO,
         itemId: String,
-        playSessionId: String?,
-        audioStreamIndex: Int = 1,
-        subtitleStreamIndex: Int? = nil,
-        client: JellyfinClient
-    ) -> URL? {
-        guard let baseURL = client.baseURL else { return nil }
-
-        // Option 1: Use transcoding URL from server (modify audio/subtitle indices)
-        if let transcodingPath = source.transcodingUrl, !transcodingPath.isEmpty {
-            // The TranscodingUrl already has AudioStreamIndex — we need to replace it
-            var modifiedPath = transcodingPath
-
-            // Replace AudioStreamIndex
-            if let range = modifiedPath.range(of: "AudioStreamIndex=\\d+", options: .regularExpression) {
-                modifiedPath.replaceSubrange(range, with: "AudioStreamIndex=\(audioStreamIndex)")
-            } else {
-                modifiedPath += "&AudioStreamIndex=\(audioStreamIndex)"
-            }
-
-            // Add or replace SubtitleStreamIndex
-            if let subIndex = subtitleStreamIndex {
-                if let range = modifiedPath.range(of: "SubtitleStreamIndex=\\d+", options: .regularExpression) {
-                    modifiedPath.replaceSubrange(range, with: "SubtitleStreamIndex=\(subIndex)")
-                } else {
-                    modifiedPath += "&SubtitleStreamIndex=\(subIndex)&SubtitleMethod=Encode"
-                }
-            } else {
-                // Remove subtitle params if present
-                modifiedPath = modifiedPath.replacingOccurrences(
-                    of: "&SubtitleStreamIndex=\\d+", with: "", options: .regularExpression
-                )
-                modifiedPath = modifiedPath.replacingOccurrences(
-                    of: "&SubtitleMethod=Encode", with: ""
-                )
-            }
-
-            if let url = URL(string: modifiedPath, relativeTo: baseURL) {
-                logger.info("Using TranscodingUrl (audio=\(audioStreamIndex), sub=\(subtitleStreamIndex ?? -1))")
-                return url.absoluteURL
+        client: JellyfinClient,
+        wrapper: VLCPlayerWrapper
+    ) {
+        let externalSubs = subtitleTracks.filter { $0.isExternal }
+        for sub in externalSubs {
+            let format = sub.codec ?? "srt"
+            if let url = client.subtitleURL(
+                itemId: itemId,
+                mediaSourceId: source.id,
+                streamIndex: sub.id,
+                format: format
+            ) {
+                wrapper.loadExternalSubtitle(url: url)
+                logger.info("Loaded external subtitle: \(sub.label) (\(format))")
             }
         }
-
-        // Option 2: Direct stream for compatible containers
-        let container = source.container?.lowercased() ?? ""
-        if ["mp4", "m4v", "mov"].contains(where: { container.contains($0) }) {
-            if let token = client.accessToken {
-                var components = URLComponents(
-                    url: baseURL.appendingPathComponent("/Videos/\(itemId)/stream"),
-                    resolvingAgainstBaseURL: false
-                )
-                components?.queryItems = [
-                    URLQueryItem(name: "static", value: "true"),
-                    URLQueryItem(name: "api_key", value: token),
-                    URLQueryItem(name: "MediaSourceId", value: source.id)
-                ]
-                if let url = components?.url {
-                    return url
-                }
-            }
-        }
-
-        // Option 3: Fallback HLS
-        return client.streamURL(itemId: itemId, mediaSourceId: source.id, playSessionId: playSessionId)
     }
 
     // MARK: - Dismiss
 
     func dismiss() {
-        playerVC?.player?.pause()
-        playerVC?.dismiss(animated: true) { [weak self] in
+        guard let vc = playerVC else { return }
+        let wrapper = playerWrapper
+        let coord = coordinator
+
+        // Report stop with final position
+        let positionMs = wrapper?.currentTimeMs ?? 0
+        let positionTicks = positionMs * 10_000
+
+        wrapper?.stop()
+
+        vc.dismiss(animated: true) { [weak self] in
+            Task {
+                await coord?.reportStop(positionTicks: positionTicks)
+            }
             self?.cleanup()
         }
     }
 
-    private func startDismissMonitor(itemId: String, client: JellyfinClient, playSessionId: String?) {
+    private func startDismissMonitor() {
         dismissCheckTask?.cancel()
         dismissCheckTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
@@ -320,12 +229,9 @@ final class PlayerLauncher: NSObject {
                 guard let self, let vc = self.playerVC else { break }
 
                 if vc.presentingViewController == nil && vc.view.window == nil {
-                    let positionTicks = Int64((vc.player?.currentTime().seconds ?? 0) * 10_000_000)
-                    try? await client.reportPlaybackStopped(
-                        itemId: itemId,
-                        positionTicks: positionTicks,
-                        playSessionId: playSessionId
-                    )
+                    let positionMs = self.playerWrapper?.currentTimeMs ?? 0
+                    let positionTicks = positionMs * 10_000
+                    await self.coordinator?.reportStop(positionTicks: positionTicks)
                     self.cleanup()
                     break
                 }
@@ -336,14 +242,15 @@ final class PlayerLauncher: NSObject {
     private func cleanup() {
         dismissCheckTask?.cancel()
         dismissCheckTask = nil
-        playerVC?.player?.pause()
-        playerVC?.player = nil
+        playerWrapper?.cleanup()
+        playerWrapper = nil
+        coordinator?.stopReporting()
+        coordinator = nil
         playerVC = nil
         currentItemId = nil
         currentClient = nil
         currentSource = nil
         currentPlaySessionId = nil
-        currentAudioIndex = nil
         audioTracks = []
         subtitleTracks = []
         logger.info("Player cleaned up")

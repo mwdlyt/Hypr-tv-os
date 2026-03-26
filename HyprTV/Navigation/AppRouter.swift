@@ -43,7 +43,7 @@ final class AppRouter {
         }
     }
 
-    /// Launch media playback via UIKit AVPlayerViewController.
+    /// Launch media playback via VLCKit (UIKit modal presentation).
     func playMedia(itemId: String) {
         guard let client = jellyfinClient else { return }
         Task { @MainActor in

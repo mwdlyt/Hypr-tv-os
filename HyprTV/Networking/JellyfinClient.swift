@@ -326,27 +326,25 @@ final class JellyfinClient {
         return try await request(.playbackInfo(userId: userId, itemId: itemId), body: body)
     }
 
-    /// Device profile describing what Apple TV 4K can play natively via AVPlayer.
+    /// Device profile describing VLCKit's native playback capabilities.
+    /// VLC can direct-play virtually everything, so this profile is very permissive.
     /// Jellyfin uses this to decide: direct play, remux, or transcode.
     private func appleTV4KDeviceProfile() -> [String: Any] {
         return [
-            "MaxStreamingBitrate": 120_000_000,
+            "MaxStreamingBitrate": 200_000_000,
             "MusicStreamingTranscodingBitrate": 384_000,
 
-            // What we can play directly (no server processing)
+            // VLC can direct-play all major container/codec combinations
             "DirectPlayProfiles": [
-                // MP4/MOV with HEVC/H.264 video + AAC/AC3/EAC3/FLAC/ALAC audio
                 [
-                    "Container": "mp4,m4v,mov",
+                    "Container": "mkv,mp4,m4v,mov,avi,webm,flv,ts,m2ts",
                     "Type": "Video",
-                    "VideoCodec": "hevc,h264,av1",
-                    "AudioCodec": "aac,ac3,eac3,flac,alac,mp3"
+                    "VideoCodec": "h264,hevc,vp9,av1,mpeg2video,vc1",
+                    "AudioCodec": "aac,ac3,eac3,truehd,dts,flac,opus,mp3,vorbis,pcm_s16le,pcm_s24le"
                 ]
             ],
 
-            // How to transcode when direct play isn't possible.
-            // IMPORTANT: Use H.264 only for transcoding — HEVC in TS segments with HDR/DV
-            // causes black video on AVPlayer. H.264 SDR is universally compatible.
+            // HLS H.264 fallback — rarely needed with VLC but keeps the server happy
             "TranscodingProfiles": [
                 [
                     "Container": "ts",
@@ -355,44 +353,29 @@ final class JellyfinClient {
                     "AudioCodec": "aac,ac3,eac3",
                     "Protocol": "hls",
                     "Context": "Streaming",
-                    "MaxAudioChannels": "6",
+                    "MaxAudioChannels": "8",
                     "MinSegments": "2",
                     "BreakOnNonKeyFrames": true,
                     "EnableSubtitlesInManifest": false,
-                    "MaxWidth": 1920,
-                    "MaxHeight": 1080
+                    "MaxWidth": 3840,
+                    "MaxHeight": 2160
                 ]
             ],
 
-            // Video codec constraints
-            "CodecProfiles": [
-                [
-                    "Type": "Video",
-                    "Codec": "hevc",
-                    "Conditions": [
-                        ["Condition": "LessThanEqual", "Property": "VideoBitDepth", "Value": "10", "IsRequired": false]
-                    ]
-                ],
-                [
-                    "Type": "Video",
-                    "Codec": "h264",
-                    "Conditions": [
-                        ["Condition": "LessThanEqual", "Property": "VideoBitDepth", "Value": "8", "IsRequired": false],
-                        ["Condition": "LessThanEqual", "Property": "VideoLevel", "Value": "52", "IsRequired": false]
-                    ]
-                ]
-            ],
+            // No restrictive codec conditions — VLC handles everything
+            "CodecProfiles": [] as [[String: Any]],
 
-            // Subtitle handling
+            // VLC handles all subtitle formats natively (embedded in container)
             "SubtitleProfiles": [
-                ["Format": "vtt", "Method": "External"],
-                ["Format": "srt", "Method": "External"],
-                ["Format": "ass", "Method": "Encode"],
-                ["Format": "ssa", "Method": "Encode"],
-                ["Format": "pgs", "Method": "Encode"],
-                ["Format": "pgssub", "Method": "Encode"],
-                ["Format": "dvdsub", "Method": "Encode"],
-                ["Format": "sub", "Method": "Encode"]
+                ["Format": "srt", "Method": "Embed"],
+                ["Format": "ass", "Method": "Embed"],
+                ["Format": "ssa", "Method": "Embed"],
+                ["Format": "vtt", "Method": "Embed"],
+                ["Format": "pgs", "Method": "Embed"],
+                ["Format": "pgssub", "Method": "Embed"],
+                ["Format": "dvdsub", "Method": "Embed"],
+                ["Format": "dvbsub", "Method": "Embed"],
+                ["Format": "sub", "Method": "Embed"]
             ],
 
             "ContainerProfiles": [] as [[String: Any]]
@@ -566,39 +549,50 @@ final class JellyfinClient {
         return components?.url
     }
 
-    /// Constructs a direct stream URL for playback with authentication baked in.
-    /// Returns an HLS master playlist URL for the given item.
-    /// Includes full transcoding parameters so Jellyfin properly handles:
-    /// - MKV → HLS remux/transcode
-    /// - HDR → SDR tonemapping when needed
-    /// - TrueHD/DTS → AAC audio transcoding
-    /// - 4K HEVC pass-through when compatible
+    /// Constructs a direct stream URL for VLC playback.
+    /// VLC can handle MKV, all video/audio codecs, and all subtitle formats natively,
+    /// so we request the raw file with `static=true` (no server-side processing).
     func streamURL(itemId: String, mediaSourceId: String? = nil, playSessionId: String? = nil) -> URL? {
+        guard let baseURL, let token = accessToken else { return nil }
+
+        var components = URLComponents(
+            url: baseURL.appendingPathComponent("/Videos/\(itemId)/stream"),
+            resolvingAgainstBaseURL: false
+        )
+        var queryItems = [
+            URLQueryItem(name: "static", value: "true"),
+            URLQueryItem(name: "api_key", value: token),
+        ]
+        if let mediaSourceId {
+            queryItems.append(URLQueryItem(name: "MediaSourceId", value: mediaSourceId))
+        }
+        if let playSessionId {
+            queryItems.append(URLQueryItem(name: "PlaySessionId", value: playSessionId))
+        }
+        components?.queryItems = queryItems
+        return components?.url
+    }
+
+    /// Constructs an HLS master playlist URL as a fallback when direct streaming is not possible.
+    /// Includes full transcoding parameters for server-side processing.
+    func streamURLHLS(itemId: String, mediaSourceId: String? = nil, playSessionId: String? = nil) -> URL? {
         guard let baseURL, let token = accessToken else { return nil }
 
         var components = URLComponents(url: baseURL.appendingPathComponent("/Videos/\(itemId)/master.m3u8"), resolvingAgainstBaseURL: false)
         var queryItems = [
             URLQueryItem(name: "api_key", value: token),
             URLQueryItem(name: "DeviceId", value: deviceId),
-            // Video: Apple TV 4K supports H.264 and HEVC hardware decode
-            URLQueryItem(name: "VideoCodec", value: "hevc,h264"),
-            // Audio: codecs AVPlayer supports natively
-            URLQueryItem(name: "AudioCodec", value: "aac,ac3,eac3,flac,alac"),
-            // Max bitrate — triggers transcoding for incompatible streams
-            // 120 Mbps allows most 4K remux to pass through
+            URLQueryItem(name: "VideoCodec", value: "h264"),
+            URLQueryItem(name: "AudioCodec", value: "aac,ac3,eac3"),
             URLQueryItem(name: "MaxStreamingBitrate", value: "120000000"),
             URLQueryItem(name: "MaxAudioChannels", value: "8"),
             URLQueryItem(name: "TranscodingMaxAudioChannels", value: "8"),
-            // HLS segment settings
             URLQueryItem(name: "SegmentContainer", value: "ts"),
             URLQueryItem(name: "MinSegments", value: "2"),
             URLQueryItem(name: "BreakOnNonKeyFrames", value: "true"),
-            // Container support — tell Jellyfin what containers we handle
             URLQueryItem(name: "TranscodingContainer", value: "ts"),
             URLQueryItem(name: "TranscodingProtocol", value: "hls"),
-            // Subtitle method — deliver as separate stream
             URLQueryItem(name: "SubtitleMethod", value: "Encode"),
-            // Context
             URLQueryItem(name: "context", value: "Streaming"),
         ]
         if let mediaSourceId {

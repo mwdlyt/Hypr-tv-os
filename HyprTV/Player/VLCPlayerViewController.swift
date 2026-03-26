@@ -14,6 +14,8 @@ final class VLCPlayerViewController: UIViewController {
     // MARK: - Properties
 
     let playerWrapper: VLCPlayerWrapper
+    /// Called when the user presses the Menu button on the Siri Remote.
+    var onMenuPressed: (() -> Void)?
     private let logger = Logger.player
 
     // MARK: - Initialisation
@@ -48,6 +50,16 @@ final class VLCPlayerViewController: UIViewController {
 
         playerWrapper.setup()
         logger.debug("VLCPlayerViewController: viewDidLoad complete")
+    }
+
+    // MARK: - Menu Button
+
+    override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        if presses.contains(where: { $0.type == .menu }), let onMenuPressed {
+            onMenuPressed()
+            return
+        }
+        super.pressesBegan(presses, with: event)
     }
 
     override func viewDidDisappear(_ animated: Bool) {
