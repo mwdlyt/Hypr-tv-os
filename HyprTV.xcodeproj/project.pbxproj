@@ -19,6 +19,7 @@
 		1D4FCE927E9F2ACAB9B51B2F /* VLCPlayerViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A256CC510FCF7B258DFBF70D /* VLCPlayerViewController.swift */; };
 		1D79ED353A710C8FC1B9C8C6 /* SkipButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95E689E6BD8E346EAF4B1E1E /* SkipButton.swift */; };
 		1DF05E7D53DCE4E3EEC4A052 /* SubtitleStyleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEF22B80F96ED24155B80C71 /* SubtitleStyleView.swift */; };
+		26622EF03D97F51402C65ABD /* ScreenTourTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CB5D5C39C147CD979F83297 /* ScreenTourTests.swift */; };
 		2671801888D8C0F97AAEAA1E /* GenreDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3C20FC42879AA8EF2ECB45D /* GenreDTO.swift */; };
 		267A8169AC3742C252E07A13 /* UserPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0745CFD84FADEF6EF7F5AA1 /* UserPolicy.swift */; };
 		30D3328FF50861B995A7FFFB /* AuthResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E6B6F34244E2F5AB8663214 /* AuthResponse.swift */; };
@@ -82,6 +83,16 @@
 		FE406BCC13B82DFB7C7086A3 /* CastCrewRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE95A8D14109B0E8CF2942B4 /* CastCrewRow.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		4F66149CD42F024EF03C9F38 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C9CAA2F80039B46E612A53F4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 27CC55196B25AF65582CFE82;
+			remoteInfo = HyprTV;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		019BCE34112DD838AF9E50BA /* VLCPlayerWrapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VLCPlayerWrapper.swift; sourceTree = "<group>"; };
 		0AE391585E01687B69582382 /* MediaRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaRowView.swift; sourceTree = "<group>"; };
@@ -117,11 +128,13 @@
 		77CBDA180F855961E6F2B054 /* UserProfilePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfilePickerView.swift; sourceTree = "<group>"; };
 		7DE38E68948A81861A9FDE24 /* MediaDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaDetailViewModel.swift; sourceTree = "<group>"; };
 		81F0274BF616B185AF1601B5 /* MediaDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaDetailView.swift; sourceTree = "<group>"; };
+		81F74DD404A5A04343D75FFD /* HyprTVUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = HyprTVUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		840564D6E1C480FFB1DE5476 /* ServerStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerStore.swift; sourceTree = "<group>"; };
 		88A1B1876705EE31400588BF /* ServerConnectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerConnectionView.swift; sourceTree = "<group>"; };
 		8A8DCDBA8F6F1774D09C4272 /* AudioSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSettingsView.swift; sourceTree = "<group>"; };
 		8BFDC525B93EE17E7A81D456 /* SavedServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedServer.swift; sourceTree = "<group>"; };
 		8CA85248227332F356F5BF00 /* LoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingView.swift; sourceTree = "<group>"; };
+		8CB5D5C39C147CD979F83297 /* ScreenTourTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenTourTests.swift; sourceTree = "<group>"; };
 		9320CCC064AF2F933E901F2A /* PlayerRepresentable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerRepresentable.swift; sourceTree = "<group>"; };
 		942363D9891E9B519090D3A0 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		95E689E6BD8E346EAF4B1E1E /* SkipButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkipButton.swift; sourceTree = "<group>"; };
@@ -278,6 +291,7 @@
 			isa = PBXGroup;
 			children = (
 				9B2AE6731A412146827D52BE /* HyprTV */,
+				FB1EA27C256F880EE38DFD38 /* HyprTVUITests */,
 				F59058B6E0A3B72842F66B92 /* Preview Content */,
 				E9C6E92C8470031FA79CAE21 /* Products */,
 			);
@@ -392,6 +406,7 @@
 			isa = PBXGroup;
 			children = (
 				B5B20B3C8D4E04A37BF9DD36 /* HyprTV.app */,
+				81F74DD404A5A04343D75FFD /* HyprTVUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -411,6 +426,14 @@
 				500F160193FDCFECB38481FF /* SearchView.swift */,
 			);
 			path = Search;
+			sourceTree = "<group>";
+		};
+		FB1EA27C256F880EE38DFD38 /* HyprTVUITests */ = {
+			isa = PBXGroup;
+			children = (
+				8CB5D5C39C147CD979F83297 /* ScreenTourTests.swift */,
+			);
+			path = HyprTVUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -434,6 +457,24 @@
 			productReference = B5B20B3C8D4E04A37BF9DD36 /* HyprTV.app */;
 			productType = "com.apple.product-type.application";
 		};
+		FBC08239F57F2D96306DD075 /* HyprTVUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 85B7BF731A37DB3E5AED143B /* Build configuration list for PBXNativeTarget "HyprTVUITests" */;
+			buildPhases = (
+				9F8FCFE339642BE7C45AC4A4 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				EC02275C77E29A6F5BAFD69D /* PBXTargetDependency */,
+			);
+			name = HyprTVUITests;
+			packageProductDependencies = (
+			);
+			productName = HyprTVUITests;
+			productReference = 81F74DD404A5A04343D75FFD /* HyprTVUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -443,6 +484,9 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
+					FBC08239F57F2D96306DD075 = {
+						TestTargetID = 27CC55196B25AF65582CFE82;
+					};
 				};
 			};
 			buildConfigurationList = D6BB07613CC027AA26C175B9 /* Build configuration list for PBXProject "HyprTV" */;
@@ -460,6 +504,7 @@
 			projectRoot = "";
 			targets = (
 				27CC55196B25AF65582CFE82 /* HyprTV */,
+				FBC08239F57F2D96306DD075 /* HyprTVUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -555,9 +600,43 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		9F8FCFE339642BE7C45AC4A4 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				26622EF03D97F51402C65ABD /* ScreenTourTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		EC02275C77E29A6F5BAFD69D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 27CC55196B25AF65582CFE82 /* HyprTV */;
+			targetProxy = 4F66149CD42F024EF03C9F38 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		055559D4E23EAC476DE20190 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.hypr.tv.uitests;
+				SDKROOT = appletvos;
+				TARGETED_DEVICE_FAMILY = 3;
+				TEST_HOST = "";
+				TEST_TARGET_NAME = HyprTV;
+			};
+			name = Debug;
+		};
 		10858AE4FF8F3605EA700F91 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -719,9 +798,36 @@
 			};
 			name = Debug;
 		};
+		F02F05F85CAE4394B341A039 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.hypr.tv.uitests;
+				SDKROOT = appletvos;
+				TARGETED_DEVICE_FAMILY = 3;
+				TEST_HOST = "";
+				TEST_TARGET_NAME = HyprTV;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		85B7BF731A37DB3E5AED143B /* Build configuration list for PBXNativeTarget "HyprTVUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				055559D4E23EAC476DE20190 /* Debug */,
+				F02F05F85CAE4394B341A039 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		C8D17FDC037DE1B2FCD2A2DE /* Build configuration list for PBXNativeTarget "HyprTV" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

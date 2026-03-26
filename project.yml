@@ -30,3 +30,16 @@ targets:
         DEVELOPMENT_ASSET_PATHS: "\"HyprTV/Preview Content\""
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: false
+
+  HyprTVUITests:
+    type: bundle.ui-testing
+    platform: tvOS
+    sources:
+      - path: HyprTVUITests
+    dependencies:
+      - target: HyprTV
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.hypr.tv.uitests
+        GENERATE_INFOPLIST_FILE: true
+        TEST_HOST: ""
