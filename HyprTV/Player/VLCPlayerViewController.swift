@@ -48,6 +48,10 @@ final class VLCPlayerViewController: UIViewController {
             videoView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
 
+        #if targetEnvironment(simulator)
+        addSimulatorBadge()
+        #endif
+
         playerWrapper.setup()
         logger.debug("VLCPlayerViewController: viewDidLoad complete")
     }
@@ -55,8 +59,8 @@ final class VLCPlayerViewController: UIViewController {
     // MARK: - Menu Button
 
     override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
-        if presses.contains(where: { $0.type == .menu }), let onMenuPressed {
-            onMenuPressed()
+        if presses.contains(where: { $0.type == .menu }) {
+            onMenuPressed?()
             return
         }
         super.pressesBegan(presses, with: event)
@@ -73,7 +77,25 @@ final class VLCPlayerViewController: UIViewController {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        // Ensure the VLC drawable picks up any safe-area or rotation changes.
         playerWrapper.videoView.frame = view.bounds
     }
+
+    // MARK: - Simulator Badge
+
+    #if targetEnvironment(simulator)
+    private func addSimulatorBadge() {
+        let badge = UILabel()
+        badge.text = "VLC Player (Simulator Mode)"
+        badge.font = .systemFont(ofSize: 20, weight: .medium)
+        badge.textColor = .white.withAlphaComponent(0.6)
+        badge.textAlignment = .center
+        badge.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(badge)
+
+        NSLayoutConstraint.activate([
+            badge.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            badge.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20)
+        ])
+    }
+    #endif
 }
