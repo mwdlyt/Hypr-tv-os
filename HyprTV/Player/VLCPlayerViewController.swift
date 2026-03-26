@@ -14,6 +14,7 @@ final class VLCPlayerViewController: UIViewController {
     // MARK: - Properties
 
     let playerWrapper: VLCPlayerWrapper
+    var onDismiss: (() -> Void)?
     private let logger = Logger.player
 
     // MARK: - Initialisation
@@ -46,6 +47,10 @@ final class VLCPlayerViewController: UIViewController {
             videoView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
 
+        #if targetEnvironment(simulator)
+        addSimulatorBadge()
+        #endif
+
         playerWrapper.setup()
         logger.debug("VLCPlayerViewController: viewDidLoad complete")
     }
@@ -64,4 +69,41 @@ final class VLCPlayerViewController: UIViewController {
         // Ensure the VLC drawable picks up any safe-area or rotation changes.
         playerWrapper.videoView.frame = view.bounds
     }
+
+    // MARK: - Menu Button
+
+    override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        for press in presses {
+            if press.type == .menu {
+                onDismiss?()
+                return
+            }
+        }
+        super.pressesBegan(presses, with: event)
+    }
+
+    // MARK: - Simulator Badge
+
+    #if targetEnvironment(simulator)
+    private func addSimulatorBadge() {
+        let badge = UILabel()
+        badge.text = "VLC Player (Simulator Mode)"
+        badge.textColor = UIColor.white.withAlphaComponent(0.8)
+        badge.font = .systemFont(ofSize: 22, weight: .semibold)
+        badge.backgroundColor = UIColor.systemPurple.withAlphaComponent(0.6)
+        badge.textAlignment = .center
+        badge.layer.cornerRadius = 8
+        badge.clipsToBounds = true
+        badge.translatesAutoresizingMaskIntoConstraints = false
+
+        view.addSubview(badge)
+
+        NSLayoutConstraint.activate([
+            badge.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
+            badge.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            badge.widthAnchor.constraint(equalToConstant: 400),
+            badge.heightAnchor.constraint(equalToConstant: 44),
+        ])
+    }
+    #endif
 }

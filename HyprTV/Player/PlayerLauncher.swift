@@ -97,19 +97,7 @@ final class PlayerLauncher: NSObject {
                 vc.player = player
                 vc.showsPlaybackControls = true
 
-                // Add custom info view controller for audio/subtitle selection
-                let infoVC = TrackSelectionViewController(
-                    audioTracks: audioTracks,
-                    subtitleTracks: subtitleTracks,
-                    currentAudioIndex: defaultAudioIndex,
-                    onAudioSelected: { [weak self] audioIndex in
-                        self?.switchAudioTrack(to: audioIndex)
-                    },
-                    onSubtitleSelected: { [weak self] subtitleIndex in
-                        self?.loadSubtitle(index: subtitleIndex)
-                    }
-                )
-                vc.customInfoViewController = infoVC
+                // Audio/subtitle track selection is handled by VLC's overlay system
 
                 self.playerVC = vc
 

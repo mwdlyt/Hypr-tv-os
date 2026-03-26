@@ -10,11 +10,11 @@
 		022295751A80BA55DAC9A2C7 /* MediaCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B06732DDE61E132BC5D04056 /* MediaCardView.swift */; };
 		03A39AED054A09BECEC228EA /* HeroBannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BA980299F9B5C4A31A12046 /* HeroBannerView.swift */; };
 		045188A62AEDA53BA836AC68 /* ServerStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 840564D6E1C480FFB1DE5476 /* ServerStore.swift */; };
-		05D4A8ECF7F92547400DC444 /* AVPlayerWrapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 214E63C349516B3C45B79C2D /* AVPlayerWrapper.swift */; };
+
 		086FC0E990FDB3ABD33766DF /* AudioSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39E3DBF844C0ECC8C5E90DD1 /* AudioSettings.swift */; };
 		0B770772C3E68DDCAE51115C /* AsyncPosterImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FFB81635B2D488BB9D12D67 /* AsyncPosterImage.swift */; };
 		0CA05762439A5A43C487408D /* PlayerRepresentable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9320CCC064AF2F933E901F2A /* PlayerRepresentable.swift */; };
-		130CE4BF6B5BF4FBCAC5A02C /* TrackSelectionViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D17E4E10DD0AE367EF74617 /* TrackSelectionViewController.swift */; };
+
 		13E2065653ACEEED7AECA700 /* AlphabetSidebar.swift in Sources */ = {isa = PBXBuildFile; fileRef = D836B4A04A03EC73E5F7F081 /* AlphabetSidebar.swift */; };
 		1541685E79124B98705C9D46 /* VLCStub.swift in Sources */ = {isa = PBXBuildFile; fileRef = D812B80AC8794BD6CF873B93 /* VLCStub.swift */; };
 		1B8881F0116250CE4CB87504 /* SubtitlePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 716EE53967000A30F995921E /* SubtitlePickerView.swift */; };
@@ -23,7 +23,7 @@
 		1DF05E7D53DCE4E3EEC4A052 /* SubtitleStyleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEF22B80F96ED24155B80C71 /* SubtitleStyleView.swift */; };
 		2671801888D8C0F97AAEAA1E /* GenreDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3C20FC42879AA8EF2ECB45D /* GenreDTO.swift */; };
 		267A8169AC3742C252E07A13 /* UserPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0745CFD84FADEF6EF7F5AA1 /* UserPolicy.swift */; };
-		2C2AB56DBCCC6181A3867AB2 /* AVPlayerRepresentable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4699B2DA87495FE78E7A1130 /* AVPlayerRepresentable.swift */; };
+
 		30D3328FF50861B995A7FFFB /* AuthResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E6B6F34244E2F5AB8663214 /* AuthResponse.swift */; };
 		347842D52685581A137397AD /* SubtitleStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A9DD40F3E4AA780B8CD428A /* SubtitleStyle.swift */; };
 		385807B5B9EDBEA517D161A3 /* AudioTrackPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F164C3C741F8CEC0ECE7980 /* AudioTrackPickerView.swift */; };
@@ -96,7 +96,7 @@
 		0FFB81635B2D488BB9D12D67 /* AsyncPosterImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AsyncPosterImage.swift; sourceTree = "<group>"; };
 		12CC154E17CB3BDC57571644 /* HyprTVApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HyprTVApp.swift; sourceTree = "<group>"; };
 		133C8B34D769982E97B2DFED /* MediaSegment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaSegment.swift; sourceTree = "<group>"; };
-		214E63C349516B3C45B79C2D /* AVPlayerWrapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AVPlayerWrapper.swift; sourceTree = "<group>"; };
+
 		22D7619759BD1C4F995B4C4D /* JellyfinClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JellyfinClient.swift; sourceTree = "<group>"; };
 		23675756667E7CBC6400E705 /* PlayerLauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerLauncher.swift; sourceTree = "<group>"; };
 		23686ECC94C8018CD10CA36A /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
@@ -107,7 +107,7 @@
 		39E3DBF844C0ECC8C5E90DD1 /* AudioSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSettings.swift; sourceTree = "<group>"; };
 		3BA980299F9B5C4A31A12046 /* HeroBannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeroBannerView.swift; sourceTree = "<group>"; };
 		3E6B6F34244E2F5AB8663214 /* AuthResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthResponse.swift; sourceTree = "<group>"; };
-		4699B2DA87495FE78E7A1130 /* AVPlayerRepresentable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AVPlayerRepresentable.swift; sourceTree = "<group>"; };
+
 		4D69D8C20CE6A340FCFD99AB /* MediaItemDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaItemDTO.swift; sourceTree = "<group>"; };
 		500F160193FDCFECB38481FF /* SearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchView.swift; sourceTree = "<group>"; };
 		515CAEB11E410FBE93D7DC7D /* View+TVFocus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "View+TVFocus.swift"; sourceTree = "<group>"; };
@@ -120,7 +120,7 @@
 		6ECEDD73F7BEC5966B16CDAE /* GenreTagsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenreTagsView.swift; sourceTree = "<group>"; };
 		716EE53967000A30F995921E /* SubtitlePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubtitlePickerView.swift; sourceTree = "<group>"; };
 		77CBDA180F855961E6F2B054 /* UserProfilePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfilePickerView.swift; sourceTree = "<group>"; };
-		7D17E4E10DD0AE367EF74617 /* TrackSelectionViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackSelectionViewController.swift; sourceTree = "<group>"; };
+
 		7DE38E68948A81861A9FDE24 /* MediaDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaDetailViewModel.swift; sourceTree = "<group>"; };
 		81F0274BF616B185AF1601B5 /* MediaDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaDetailView.swift; sourceTree = "<group>"; };
 		840564D6E1C480FFB1DE5476 /* ServerStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerStore.swift; sourceTree = "<group>"; };
@@ -224,14 +224,13 @@
 		41367FFD4DC4B49265E84ED7 /* Player */ = {
 			isa = PBXGroup;
 			children = (
-				4699B2DA87495FE78E7A1130 /* AVPlayerRepresentable.swift */,
-				214E63C349516B3C45B79C2D /* AVPlayerWrapper.swift */,
+
 				EA80641F83D620DCF2618FD6 /* MediaTrackPicker.swift */,
 				BEA241D1160B2109BEFD113D /* PlaybackCoordinator.swift */,
 				23675756667E7CBC6400E705 /* PlayerLauncher.swift */,
 				9320CCC064AF2F933E901F2A /* PlayerRepresentable.swift */,
 				9FEC0E8E60918C58536DAD81 /* RemoteCommandHandler.swift */,
-				7D17E4E10DD0AE367EF74617 /* TrackSelectionViewController.swift */,
+
 				A256CC510FCF7B258DFBF70D /* VLCPlayerViewController.swift */,
 				019BCE34112DD838AF9E50BA /* VLCPlayerWrapper.swift */,
 				D812B80AC8794BD6CF873B93 /* VLCStub.swift */,
@@ -489,8 +488,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2C2AB56DBCCC6181A3867AB2 /* AVPlayerRepresentable.swift in Sources */,
-				05D4A8ECF7F92547400DC444 /* AVPlayerWrapper.swift in Sources */,
+
 				13E2065653ACEEED7AECA700 /* AlphabetSidebar.swift in Sources */,
 				A25A849F22F4E0075D5839FD /* AppRouter.swift in Sources */,
 				0B770772C3E68DDCAE51115C /* AsyncPosterImage.swift in Sources */,
@@ -552,7 +550,7 @@
 				347842D52685581A137397AD /* SubtitleStyle.swift in Sources */,
 				1DF05E7D53DCE4E3EEC4A052 /* SubtitleStyleView.swift in Sources */,
 				F76FBD6187B7F7728EBE13C9 /* TimeFormatter.swift in Sources */,
-				130CE4BF6B5BF4FBCAC5A02C /* TrackSelectionViewController.swift in Sources */,
+
 				7C2CBF9458B62E78C1152620 /* URL+Jellyfin.swift in Sources */,
 				5BB62A638B5ED61A59D327A3 /* UpNextOverlayView.swift in Sources */,
 				792489144FD1F4F32BAF43E4 /* UserDTO.swift in Sources */,
