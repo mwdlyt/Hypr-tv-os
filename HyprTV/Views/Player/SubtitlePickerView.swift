@@ -1,9 +1,10 @@
 import SwiftUI
 
-/// Sheet presenting available subtitle tracks from Jellyfin (embedded + external + plugin-provided).
-/// Includes subtitle appearance customization.
+/// Sheet presenting available subtitle tracks from VLC.
+/// Includes an "Off" option and subtitle appearance settings.
 struct SubtitlePickerView: View {
 
+    let vlcWrapper: VLCPlayerWrapper
     let viewModel: PlayerViewModel
     var onStyleChanged: (() -> Void)?
 
@@ -16,6 +17,7 @@ struct SubtitlePickerView: View {
                 // Off option
                 Section {
                     Button {
+                        vlcWrapper.setSubtitleTrack(index: -1)
                         viewModel.selectSubtitleTrack(nil)
                         dismiss()
                     } label: {
@@ -23,7 +25,7 @@ struct SubtitlePickerView: View {
                             Text("Off")
                                 .font(.headline)
                             Spacer()
-                            if viewModel.selectedSubtitleTrack == nil {
+                            if vlcWrapper.selectedSubtitleTrackIndex == -1 {
                                 Image(systemName: "checkmark")
                                     .foregroundStyle(.blue)
                                     .fontWeight(.semibold)
@@ -34,15 +36,65 @@ struct SubtitlePickerView: View {
                     .buttonStyle(.plain)
                 }
 
-                // Available subtitle tracks
-                if !viewModel.subtitleTracks.isEmpty {
+                // Available subtitle tracks from VLC
+                if !vlcWrapper.subtitleTracks.isEmpty {
                     Section {
-                        ForEach(viewModel.subtitleTracks, id: \.index) { track in
+                        ForEach(vlcWrapper.subtitleTracks, id: \.index) { track in
                             Button {
-                                viewModel.selectSubtitleTrack(track)
+                                vlcWrapper.setSubtitleTrack(index: track.index)
+                                // Update viewModel if matching Jellyfin track exists
+                                if let jellyfinTrack = viewModel.subtitleTracks.first(where: { $0.index == track.index }) {
+                                    viewModel.selectSubtitleTrack(jellyfinTrack)
+                                }
                                 dismiss()
                             } label: {
-                                subtitleRow(for: track)
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(track.title)
+                                            .font(.headline)
+
+                                        // Show Jellyfin metadata if available
+                                        if let jellyfinTrack = viewModel.subtitleTracks.first(where: { $0.index == track.index }) {
+                                            HStack(spacing: 8) {
+                                                if let language = jellyfinTrack.language {
+                                                    Text(language.uppercased())
+                                                        .font(.caption)
+                                                        .foregroundStyle(.secondary)
+                                                }
+                                                if let codec = jellyfinTrack.codec {
+                                                    Text(codec.uppercased())
+                                                        .font(.caption)
+                                                        .padding(.horizontal, 6)
+                                                        .padding(.vertical, 2)
+                                                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 4))
+                                                }
+                                                if jellyfinTrack.isForced == true {
+                                                    Text("FORCED")
+                                                        .font(.caption2)
+                                                        .fontWeight(.semibold)
+                                                        .foregroundStyle(.orange)
+                                                        .padding(.horizontal, 6)
+                                                        .padding(.vertical, 2)
+                                                        .background(.orange.opacity(0.15), in: RoundedRectangle(cornerRadius: 4))
+                                                }
+                                                if jellyfinTrack.isExternal == true {
+                                                    Label("External", systemImage: "doc.text")
+                                                        .font(.caption2)
+                                                        .foregroundStyle(.cyan)
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Spacer()
+
+                                    if vlcWrapper.selectedSubtitleTrackIndex == track.index {
+                                        Image(systemName: "checkmark")
+                                            .foregroundStyle(.blue)
+                                            .fontWeight(.semibold)
+                                    }
+                                }
+                                .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
                         }
@@ -82,57 +134,5 @@ struct SubtitlePickerView: View {
                 SubtitleStyleView(onStyleChanged: onStyleChanged)
             }
         }
-    }
-
-    // MARK: - Subtitle Row
-
-    private func subtitleRow(for track: MediaStreamDTO) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(track.displayTitle ?? "Track \(track.index)")
-                    .font(.headline)
-
-                HStack(spacing: 8) {
-                    if let language = track.language {
-                        Text(language.uppercased())
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    if let codec = track.codec {
-                        Text(codec.uppercased())
-                            .font(.caption)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(.quaternary, in: RoundedRectangle(cornerRadius: 4))
-                    }
-
-                    if track.isForced == true {
-                        Text("FORCED")
-                            .font(.caption2)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(.orange)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(.orange.opacity(0.15), in: RoundedRectangle(cornerRadius: 4))
-                    }
-
-                    if track.isExternal == true {
-                        Label("External", systemImage: "doc.text")
-                            .font(.caption2)
-                            .foregroundStyle(.cyan)
-                    }
-                }
-            }
-
-            Spacer()
-
-            if viewModel.selectedSubtitleTrack?.index == track.index {
-                Image(systemName: "checkmark")
-                    .foregroundStyle(.blue)
-                    .fontWeight(.semibold)
-            }
-        }
-        .contentShape(Rectangle())
     }
 }
