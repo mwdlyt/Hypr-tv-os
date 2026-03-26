@@ -1,167 +1,168 @@
 import SwiftUI
 
-/// Transport controls overlay for the video player.
-/// Shows title, progress bar, time labels, and track selection.
-/// Auto-hides after 5 seconds of inactivity.
+/// Transport controls overlay for the VLC video player on tvOS.
+/// Bottom-aligned layout: title → action buttons → progress bar → timestamps.
+/// Auto-hides after 5 seconds of inactivity. Toggle with Siri Remote click.
 struct PlayerOverlayView: View {
 
     let viewModel: PlayerViewModel
+    let vlcWrapper: VLCPlayerWrapper
     var currentItem: MediaItemDTO?
     var onExternalSubtitleLoaded: ((URL) -> Void)?
 
     @State private var showAudioPicker = false
     @State private var showSubtitlePicker = false
-    @State private var hideTask: Task<Void, Never>?
+    @State private var isScrubbing = false
+    @State private var scrubProgress: Double = 0
+
+    @FocusState private var progressBarFocused: Bool
 
     var body: some View {
         ZStack {
-            // Gradient background for readability
-            VStack {
-                LinearGradient(
-                    colors: [.black.opacity(0.8), .clear],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 200)
+            // Gradient overlays for readability
+            gradients
+
+            VStack(spacing: 0) {
+                // Top: buffering indicator
+                HStack {
+                    if viewModel.isBuffering {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .tint(.white)
+                            Text("Buffering…")
+                                .font(.subheadline)
+                                .foregroundStyle(.white.opacity(0.7))
+                        }
+                        .padding(.top, 50)
+                        .padding(.leading, 60)
+                    }
+                    Spacer()
+                }
 
                 Spacer()
 
-                LinearGradient(
-                    colors: [.clear, .black.opacity(0.8)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 300)
-            }
-            .ignoresSafeArea()
+                // Bottom controls
+                VStack(spacing: 16) {
+                    // Title / subtitle
+                    titleSection
 
-            VStack {
-                // MARK: Top Bar - Title
-                topBar
-                    .padding(.top, 40)
-                    .padding(.horizontal, 60)
+                    // Action buttons
+                    transportControls
 
-                Spacer()
-
-                // MARK: Bottom Controls
-                VStack(spacing: 20) {
-                    // Progress Bar
+                    // Progress bar
                     progressBar
                         .padding(.horizontal, 60)
 
-                    // Time Labels
+                    // Time labels
                     HStack {
-                        Text(viewModel.currentTimeFormatted)
+                        Text(isScrubbing ? scrubTimeFormatted : viewModel.currentTimeFormatted)
                             .font(.callout)
                             .monospacedDigit()
-
                         Spacer()
-
-                        Text(viewModel.durationFormatted)
+                        Text(viewModel.remainingTimeFormatted)
                             .font(.callout)
                             .monospacedDigit()
                     }
                     .foregroundStyle(.white.opacity(0.8))
                     .padding(.horizontal, 60)
-
-                    // Transport Controls
-                    transportControls
-                        .padding(.bottom, 40)
+                    .padding(.bottom, 50)
                 }
             }
         }
         .foregroundStyle(.white)
-        .onAppear {
-            scheduleAutoHide()
-        }
-        .onChange(of: viewModel.showOverlay) { _, newValue in
-            if newValue {
-                scheduleAutoHide()
-            }
-        }
         .sheet(isPresented: $showAudioPicker) {
-            AudioTrackPickerView(viewModel: viewModel)
+            AudioTrackPickerView(vlcWrapper: vlcWrapper, viewModel: viewModel)
         }
         .sheet(isPresented: $showSubtitlePicker) {
-            SubtitlePickerView(viewModel: viewModel)
+            SubtitlePickerView(vlcWrapper: vlcWrapper, viewModel: viewModel, onStyleChanged: nil)
         }
     }
 
-    // MARK: - Top Bar
+    // MARK: - Gradients
 
-    private var topBar: some View {
+    private var gradients: some View {
+        VStack {
+            LinearGradient(
+                colors: [.black.opacity(0.7), .clear],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 200)
+
+            Spacer()
+
+            LinearGradient(
+                colors: [.clear, .black.opacity(0.85)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 350)
+        }
+        .ignoresSafeArea()
+    }
+
+    // MARK: - Title Section
+
+    private var titleSection: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                if viewModel.isBuffering {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                            .tint(.white)
-                        Text("Buffering...")
+                if let item = currentItem {
+                    // Series info subtitle line
+                    if item.type == .episode, let seriesName = item.seriesName {
+                        Text(seriesName)
                             .font(.subheadline)
                             .foregroundStyle(.white.opacity(0.7))
                     }
+
+                    // Main title
+                    Text(titleText(for: item))
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                        .lineLimit(1)
                 }
             }
-
             Spacer()
         }
+        .padding(.horizontal, 60)
     }
 
-    // MARK: - Progress Bar
-
-    private var progressBar: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .leading) {
-                // Track background
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(.white.opacity(0.3))
-                    .frame(height: 8)
-
-                // Progress fill
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(.blue)
-                    .frame(
-                        width: max(0, geometry.size.width * viewModel.progress),
-                        height: 8
-                    )
-
-                // Scrubber head
-                Circle()
-                    .fill(.white)
-                    .frame(width: 20, height: 20)
-                    .shadow(color: .black.opacity(0.3), radius: 4)
-                    .offset(x: max(0, geometry.size.width * viewModel.progress - 10))
-            }
+    private func titleText(for item: MediaItemDTO) -> String {
+        if item.type == .episode,
+           let season = item.parentIndexNumber,
+           let episode = item.indexNumber {
+            return "S\(season):E\(episode) — \(item.name)"
         }
-        .frame(height: 20)
-        .focusable()
+        return item.name
     }
 
     // MARK: - Transport Controls
 
     private var transportControls: some View {
         HStack(spacing: 40) {
-            // Seek backward
+            // Seek backward 15s
             Button {
-                viewModel.seek(to: max(0, viewModel.currentTime - 15))
+                vlcWrapper.seekRelative(by: -15_000)
+                viewModel.resetOverlayTimer()
             } label: {
                 Image(systemName: "gobackward.15")
                     .font(.title2)
             }
             .buttonStyle(.plain)
 
-            // Play/Pause
+            // Play / Pause
             Button {
-                viewModel.togglePlayPause()
+                vlcWrapper.togglePlayPause()
+                viewModel.resetOverlayTimer()
             } label: {
-                Image(systemName: viewModel.isPlaying ? "pause.fill" : "play.fill")
+                Image(systemName: vlcWrapper.isPlaying ? "pause.fill" : "play.fill")
                     .font(.system(size: 44))
             }
             .buttonStyle(.plain)
 
-            // Seek forward
+            // Seek forward 30s
             Button {
-                viewModel.seek(to: min(viewModel.duration, viewModel.currentTime + 30))
+                vlcWrapper.seekRelative(by: 30_000)
+                viewModel.resetOverlayTimer()
             } label: {
                 Image(systemName: "goforward.30")
                     .font(.title2)
@@ -171,18 +172,20 @@ struct PlayerOverlayView: View {
             Spacer()
                 .frame(width: 40)
 
-            // Audio Track
+            // Audio track picker
             Button {
                 showAudioPicker = true
+                viewModel.resetOverlayTimer()
             } label: {
                 Image(systemName: "speaker.wave.2.fill")
                     .font(.title3)
             }
             .buttonStyle(.plain)
 
-            // Subtitle Track
+            // Subtitle picker
             Button {
                 showSubtitlePicker = true
+                viewModel.resetOverlayTimer()
             } label: {
                 Image(systemName: "captions.bubble.fill")
                     .font(.title3)
@@ -190,21 +193,91 @@ struct PlayerOverlayView: View {
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 60)
+        .focusSection()
     }
 
-    // MARK: - Auto Hide
+    // MARK: - Progress Bar
 
-    private func scheduleAutoHide() {
-        hideTask?.cancel()
-        hideTask = Task {
-            try? await Task.sleep(for: .seconds(5))
-            guard !Task.isCancelled else { return }
-            await MainActor.run {
-                if viewModel.showOverlay {
-                    viewModel.toggleOverlay()
+    private var progressBar: some View {
+        GeometryReader { geometry in
+            let effectiveProgress = isScrubbing ? scrubProgress : viewModel.progress
+
+            ZStack(alignment: .leading) {
+                // Track background
+                Capsule()
+                    .fill(.white.opacity(0.3))
+                    .frame(height: progressBarFocused ? 12 : 8)
+
+                // Progress fill
+                Capsule()
+                    .fill(Color.blue)
+                    .frame(
+                        width: max(0, geometry.size.width * effectiveProgress),
+                        height: progressBarFocused ? 12 : 8
+                    )
+
+                // Scrubber head (visible when focused)
+                if progressBarFocused {
+                    Circle()
+                        .fill(.white)
+                        .frame(width: 24, height: 24)
+                        .shadow(color: .black.opacity(0.4), radius: 4)
+                        .offset(x: max(0, min(geometry.size.width * effectiveProgress - 12, geometry.size.width - 24)))
                 }
             }
+            .animation(.easeInOut(duration: 0.15), value: progressBarFocused)
         }
+        .frame(height: 24)
+        .focusable()
+        .focused($progressBarFocused)
+        .onMoveCommand { direction in
+            viewModel.resetOverlayTimer()
+            switch direction {
+            case .left:
+                if !isScrubbing {
+                    isScrubbing = true
+                    scrubProgress = viewModel.progress
+                }
+                scrubProgress = max(0, scrubProgress - 0.01) // ~1% per tick
+            case .right:
+                if !isScrubbing {
+                    isScrubbing = true
+                    scrubProgress = viewModel.progress
+                }
+                scrubProgress = min(1, scrubProgress + 0.01)
+            default:
+                break
+            }
+        }
+        .onExitCommand {
+            // Commit scrub on menu press while scrubbing
+            if isScrubbing {
+                commitScrub()
+            }
+        }
+        .onChange(of: progressBarFocused) { _, focused in
+            if !focused && isScrubbing {
+                commitScrub()
+            }
+        }
+    }
+
+    private func commitScrub() {
+        guard isScrubbing else { return }
+        let targetMs = Int64(scrubProgress * Double(vlcWrapper.durationMs))
+        vlcWrapper.seek(to: targetMs)
+        isScrubbing = false
+    }
+
+    private var scrubTimeFormatted: String {
+        let totalSeconds = Int(scrubProgress * Double(vlcWrapper.durationMs) / 1000)
+        let hours = totalSeconds / 3600
+        let minutes = (totalSeconds % 3600) / 60
+        let seconds = totalSeconds % 60
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, minutes, seconds)
+        }
+        return String(format: "%d:%02d", minutes, seconds)
     }
 }
 
@@ -213,6 +286,5 @@ struct PlayerOverlayView: View {
 #Preview {
     ZStack {
         Color.black.ignoresSafeArea()
-        // PlayerOverlayView requires a real viewModel
     }
 }

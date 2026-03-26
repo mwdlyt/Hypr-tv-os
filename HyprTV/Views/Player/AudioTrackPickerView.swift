@@ -1,9 +1,10 @@
 import SwiftUI
 
-/// Sheet presenting a list of available audio tracks for the current media.
-/// Shows language, codec, and channel information for each track.
+/// Sheet presenting available audio tracks from VLC.
+/// Shows VLC track names and indicates the currently selected track.
 struct AudioTrackPickerView: View {
 
+    let vlcWrapper: VLCPlayerWrapper
     let viewModel: PlayerViewModel
 
     @Environment(\.dismiss) private var dismiss
@@ -11,50 +12,55 @@ struct AudioTrackPickerView: View {
     var body: some View {
         NavigationStack {
             List {
-                ForEach(viewModel.audioTracks, id: \.index) { track in
+                // VLC audio tracks
+                ForEach(vlcWrapper.audioTracks, id: \.index) { track in
                     Button {
-                        viewModel.selectAudioTrack(track)
+                        vlcWrapper.setAudioTrack(index: track.index)
+                        // Also update viewModel's selected track if matching by index
+                        if let jellyfinTrack = viewModel.audioTracks.first(where: { $0.index == track.index }) {
+                            viewModel.selectAudioTrack(jellyfinTrack)
+                        }
                         dismiss()
                     } label: {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(track.displayTitle ?? "Audio Track \(track.index)")
+                                Text(track.title)
                                     .font(.headline)
 
-                                HStack(spacing: 8) {
-                                    if let language = track.language {
-                                        Text(language.uppercased())
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-
-                                    if let codec = track.codec {
-                                        Text(codec.uppercased())
-                                            .font(.caption)
-                                            .foregroundStyle(.tertiary)
-                                    }
-
-                                    if let channels = track.channels {
-                                        Text(channelLayout(channels))
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-
-                                    if track.isDefault == true {
-                                        Text("DEFAULT")
-                                            .font(.caption2)
-                                            .fontWeight(.semibold)
-                                            .foregroundStyle(.blue)
-                                            .padding(.horizontal, 6)
-                                            .padding(.vertical, 2)
-                                            .background(.blue.opacity(0.15), in: RoundedRectangle(cornerRadius: 4))
+                                // Show Jellyfin metadata if available
+                                if let jellyfinTrack = viewModel.audioTracks.first(where: { $0.index == track.index }) {
+                                    HStack(spacing: 8) {
+                                        if let language = jellyfinTrack.language {
+                                            Text(language.uppercased())
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        if let codec = jellyfinTrack.codec {
+                                            Text(codec.uppercased())
+                                                .font(.caption)
+                                                .foregroundStyle(.tertiary)
+                                        }
+                                        if let channels = jellyfinTrack.channels {
+                                            Text(channelLayout(channels))
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        if jellyfinTrack.isDefault == true {
+                                            Text("DEFAULT")
+                                                .font(.caption2)
+                                                .fontWeight(.semibold)
+                                                .foregroundStyle(.blue)
+                                                .padding(.horizontal, 6)
+                                                .padding(.vertical, 2)
+                                                .background(.blue.opacity(0.15), in: RoundedRectangle(cornerRadius: 4))
+                                        }
                                     }
                                 }
                             }
 
                             Spacer()
 
-                            if viewModel.selectedAudioTrack?.index == track.index {
+                            if vlcWrapper.selectedAudioTrackIndex == track.index {
                                 Image(systemName: "checkmark")
                                     .foregroundStyle(.blue)
                                     .fontWeight(.semibold)
@@ -65,7 +71,7 @@ struct AudioTrackPickerView: View {
                     .buttonStyle(.plain)
                 }
 
-                if viewModel.audioTracks.isEmpty {
+                if vlcWrapper.audioTracks.isEmpty {
                     Text("No audio tracks available")
                         .font(.headline)
                         .foregroundStyle(.secondary)
@@ -84,7 +90,6 @@ struct AudioTrackPickerView: View {
 
     // MARK: - Helpers
 
-    /// Converts channel count to a human-readable layout string.
     private func channelLayout(_ channels: Int) -> String {
         switch channels {
         case 1: return "Mono"
