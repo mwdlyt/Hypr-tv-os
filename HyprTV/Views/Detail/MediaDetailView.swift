@@ -90,26 +90,26 @@ struct MediaDetailView: View {
 
     // MARK: - Backdrop with Poster & Metadata
 
+    @State private var backdropImage: UIImage?
+
     private func backdropWithMetadata(item: MediaItemDTO, viewModel: MediaDetailViewModel) -> some View {
         ZStack(alignment: .bottomLeading) {
-            // Background backdrop
-            if let backdropURL = backdropURL(for: item) {
-                AsyncImage(url: backdropURL) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(height: 700)
-                            .clipped()
-                    case .failure, .empty:
-                        backdropPlaceholder
-                    @unknown default:
-                        backdropPlaceholder
-                    }
+            // Background backdrop — uses ImageLoader so it shares the
+            // multi-tier cache with the rest of the app instead of
+            // re-downloading through SwiftUI's AsyncImage.
+            Group {
+                if let backdropImage {
+                    Image(uiImage: backdropImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(height: 700)
+                        .clipped()
+                } else {
+                    backdropPlaceholder
                 }
-            } else {
-                backdropPlaceholder
+            }
+            .task(id: item.id) {
+                await loadBackdropImage(for: item)
             }
 
             // Gradient overlay for readability
@@ -395,6 +395,19 @@ struct MediaDetailView: View {
             maxWidth: Constants.Images.posterMaxWidth,
             tag: tag
         )
+    }
+
+    /// Loads the backdrop through ImageLoader so the 3-tier cache is used
+    /// (vs SwiftUI's AsyncImage which always hits the network).
+    private func loadBackdropImage(for item: MediaItemDTO) async {
+        guard let url = backdropURL(for: item) else {
+            backdropImage = nil
+            return
+        }
+        // Fullscreen backdrop — request a high-quality downsample.
+        let loaded = await ImageLoader.shared.loadImage(from: url, maxPixelSize: 2048)
+        guard !Task.isCancelled else { return }
+        backdropImage = loaded
     }
 }
 

@@ -265,7 +265,9 @@ struct HeroBannerView: View {
               let url = backdropURL(for: items[index]) else { return }
 
         Task {
-            let loaded = await ImageLoader.shared.loadImage(from: url)
+            // Full-screen hero banner — let the loader keep the server-provided
+            // 1920px backdrop instead of downsampling to the poster default.
+            let loaded = await ImageLoader.shared.loadImage(from: url, maxPixelSize: 2048)
             guard let loaded else { return }
 
             await MainActor.run {

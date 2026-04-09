@@ -177,30 +177,43 @@ final class ServerConnectionViewModel {
     /// Attempts to restore a previously authenticated session from the keychain.
     /// Silently returns on failure so the user can log in manually.
     func tryRestoreSession() async {
-        guard let savedURL = UserDefaultsStore.string(for: .lastServerURL),
-              let url = URL(string: savedURL) else {
+        // Only try to restore if we actually have saved credentials in the
+        // keychain. Otherwise we'd waste a network round-trip and end up in
+        // an inconsistent `.authenticated` state with no token.
+        guard KeychainService.get(.accessToken) != nil,
+              KeychainService.get(.userId) != nil,
+              let urlString = KeychainService.get(.serverURL),
+              let url = URL(string: urlString) else {
             return
         }
 
-        serverURL = savedURL
+        serverURL = urlString
         isConnecting = true
+        defer { isConnecting = false }
 
         do {
-            let info = try await client.connectToServer(url: url)
-            serverInfo = info
-            connectionState = .connected
-
-            try await authService.restoreSession()
-            connectionState = .authenticated
-        } catch {
-            // Session restoration is best-effort; drop back to appropriate state
-            connectionState = serverInfo != nil ? .profileSelection : .disconnected
-            if serverInfo != nil {
+            // `restoreSession` rehydrates the client from keychain and
+            // validates the token by calling a lightweight endpoint.
+            let restored = try await authService.restoreSession()
+            if restored {
+                connectionState = .authenticated
+            } else {
+                // Keychain values disappeared between the pre-check and the
+                // call; fall back to the server handshake below.
+                let info = try await client.connectToServer(url: url)
+                serverInfo = info
+                connectionState = .profileSelection
                 profileViewModel = UserProfileViewModel(client: client, authService: authService)
             }
+        } catch {
+            // Session restoration is best-effort. If the server rejected the
+            // token or is unreachable, wipe any stale credentials and surface
+            // the server picker again.
+            authService.logout()
+            connectionState = .disconnected
+            serverInfo = nil
+            profileViewModel = nil
         }
-
-        isConnecting = false
     }
 
     // MARK: - Private Helpers

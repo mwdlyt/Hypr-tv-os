@@ -150,10 +150,13 @@ struct HomeView: View {
             tag: tag
         ) else { return }
 
-        guard let loaded = await ImageLoader.shared.loadImage(from: url) else { return }
+        // Backdrops need to fill a 1080p+ display — let the loader keep the
+        // full 960px server response rather than downsampling to the poster default.
+        guard let loaded = await ImageLoader.shared.loadImage(from: url, maxPixelSize: 1024) else { return }
         guard !Task.isCancelled else { return }
 
         await MainActor.run {
+            guard !Task.isCancelled else { return }
             previousBackdrop = currentBackdrop
             showCurrent = false
 

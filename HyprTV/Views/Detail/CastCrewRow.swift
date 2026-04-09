@@ -15,7 +15,11 @@ struct CastCrewRow: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(spacing: 20) {
-                    ForEach(people, id: \.id) { person in
+                    // Use index-based identity: Jellyfin can return the same
+                    // person ID twice when someone is both an actor and a
+                    // director on the same title, which would crash
+                    // ForEach's uniqueness assertion.
+                    ForEach(Array(people.enumerated()), id: \.offset) { _, person in
                         personCard(person)
                     }
                 }
@@ -27,21 +31,11 @@ struct CastCrewRow: View {
 
     private func personCard(_ person: PersonDTO) -> some View {
         VStack(spacing: 8) {
+            // Circular avatar via shared ImageLoader (3-tier cache) so
+            // scrolling back to a detail view doesn't re-download portraits.
             if let imageURL = personImageURL(person) {
-                AsyncImage(url: imageURL) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: 100, height: 100)
-                            .clipShape(Circle())
-                    case .failure, .empty:
-                        personPlaceholder
-                    @unknown default:
-                        personPlaceholder
-                    }
-                }
+                AsyncPosterImage(url: imageURL, width: 100, height: 100)
+                    .clipShape(Circle())
             } else {
                 personPlaceholder
             }

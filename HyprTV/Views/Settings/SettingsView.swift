@@ -72,12 +72,18 @@ struct SettingsView: View {
 
             Section {
                 Button("Switch Server") {
+                    // Clear the keychain too — otherwise the next launch
+                    // auto-restores the previous server and Switch Server
+                    // becomes a no-op on cold start.
+                    KeychainService.deleteAll()
+                    UserDefaultsStore.set(nil, for: .lastServerURL)
                     jellyfinClient.clearSession()
                 }
 
                 Button("Sign Out", role: .destructive) {
-                    jellyfinClient.clearSession()
                     KeychainService.deleteAll()
+                    UserDefaultsStore.set(nil, for: .lastServerURL)
+                    jellyfinClient.clearSession()
                 }
             } header: {
                 Text("Account")

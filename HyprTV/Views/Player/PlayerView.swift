@@ -4,11 +4,18 @@ import SwiftUI
 /// Handles Siri Remote input for play/pause, overlay toggle, seeking, and dismissal.
 struct PlayerView: View {
 
-    let itemId: String
-    var currentItem: MediaItemDTO?
+    init(itemId: String, currentItem: MediaItemDTO?) {
+        self._activeItemId = State(initialValue: itemId)
+        self._currentItem = State(initialValue: currentItem)
+    }
 
     @Environment(JellyfinClient.self) private var jellyfinClient
     @Environment(\.dismiss) private var dismiss
+
+    /// The id and metadata of the item currently playing. These change when
+    /// the Up Next flow auto-advances to the next episode.
+    @State private var activeItemId: String
+    @State private var currentItem: MediaItemDTO?
 
     @State private var viewModel: PlayerViewModel?
     @State private var vlcWrapper = VLCPlayerWrapper()
@@ -104,7 +111,7 @@ struct PlayerView: View {
     // MARK: - Playback Lifecycle
 
     private func startPlayback() {
-        let vm = PlayerViewModel(itemId: itemId, client: jellyfinClient)
+        let vm = PlayerViewModel(itemId: activeItemId, client: jellyfinClient)
         viewModel = vm
 
         Task {
@@ -144,10 +151,14 @@ struct PlayerView: View {
 
     private func stopPlayback() {
         hideTask?.cancel()
+        hideTask = nil
         progressReportTask?.cancel()
+        progressReportTask = nil
 
+        // Capture the VM locally so the dismissed view doesn't drop the report.
+        let vmToStop = viewModel
         Task {
-            await viewModel?.reportStop()
+            await vmToStop?.reportStop()
         }
 
         vlcWrapper.cleanup()
@@ -240,24 +251,39 @@ struct PlayerView: View {
     private func playNextEpisode() {
         guard let nextEp = viewModel?.nextEpisode else { return }
 
-        // Stop current playback
+        // Capture the old VM before replacing so we can report stop on the
+        // server. Without this the Jellyfin session just dangles and
+        // Continue Watching keeps the old episode forever.
+        let oldVM = viewModel
+        progressReportTask?.cancel()
+        progressReportTask = nil
+
+        // Stop current playback and reset Up Next state on the old VM.
         vlcWrapper.stop()
-        viewModel?.resetUpNextState()
+        oldVM?.resetUpNextState()
 
         // Start new episode
         let newVM = PlayerViewModel(itemId: nextEp.id, client: jellyfinClient)
         viewModel = newVM
+        activeItemId = nextEp.id
+        currentItem = nextEp
 
         Task {
+            // Finalise the old episode on the server before the new one starts.
+            await oldVM?.reportStop()
+
             do {
                 let url = try await newVM.loadPlaybackInfo()
+                for sub in newVM.externalSubtitleURLs() {
+                    vlcWrapper.loadExternalSubtitle(url: sub.url)
+                }
                 await newVM.loadSegments()
                 await newVM.loadNextEpisode(currentItem: nextEp)
 
                 vlcWrapper.playURL(url)
                 await newVM.reportStart()
                 startProgressReporting()
-                scheduleAutoHide()
+                showOverlay()
             } catch {
                 newVM.error = error.localizedDescription
             }

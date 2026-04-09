@@ -232,19 +232,31 @@ struct PlayerOverlayView: View {
         .focused($progressBarFocused)
         .onMoveCommand { direction in
             viewModel.resetOverlayTimer()
+
+            // Scrub in ~10-second increments regardless of total runtime so
+            // the user gets predictable jumps. For very short clips (< 10s)
+            // we fall back to a 5% step.
+            let durationMs = vlcWrapper.durationMs
+            let stepFraction: Double
+            if durationMs > 10_000 {
+                stepFraction = 10_000.0 / Double(durationMs)
+            } else {
+                stepFraction = 0.05
+            }
+
             switch direction {
             case .left:
                 if !isScrubbing {
                     isScrubbing = true
                     scrubProgress = viewModel.progress
                 }
-                scrubProgress = max(0, scrubProgress - 0.01) // ~1% per tick
+                scrubProgress = max(0, scrubProgress - stepFraction)
             case .right:
                 if !isScrubbing {
                     isScrubbing = true
                     scrubProgress = viewModel.progress
                 }
-                scrubProgress = min(1, scrubProgress + 0.01)
+                scrubProgress = min(1, scrubProgress + stepFraction)
             default:
                 break
             }

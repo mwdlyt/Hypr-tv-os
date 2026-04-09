@@ -79,6 +79,10 @@ final class HomeViewModel {
     /// Fetches all data needed for the home screen: libraries, resume items,
     /// and the latest additions per library. Errors on individual library
     /// fetches are swallowed so the rest of the screen still renders.
+    ///
+    /// Concurrency: results are collected into local task-group outputs and
+    /// assigned to `self` only after the group completes. This avoids
+    /// racing concurrent writes to `latestItemsByLibrary` from background tasks.
     func loadHome() async {
         isLoading = true
         error = nil
@@ -86,20 +90,36 @@ final class HomeViewModel {
         do {
             // Fetch the library list first -- we need it to know which
             // per-library "Latest" rows to request.
-            libraries = try await client.getLibraries()
+            let fetchedLibraries = try await client.getLibraries()
+            libraries = fetchedLibraries
 
-            // Resume items and per-library latest items can be fetched concurrently.
-            await withTaskGroup(of: Void.self) { group in
-                group.addTask { [self] in
-                    await loadResumeItems()
-                }
+            // Fetch resume items and per-library latest items concurrently,
+            // then assign results in a single pass once everything finishes.
+            // Mutating `self.latestItemsByLibrary` only after all tasks
+            // complete prevents concurrent dictionary writes.
+            async let resumeFetch: [MediaItemDTO] = fetchResumeItems()
 
-                for library in libraries {
-                    group.addTask { [self] in
-                        await loadLatestItems(for: library)
+            var byLibrary: [String: [MediaItemDTO]] = [:]
+            await withTaskGroup(of: (String, [MediaItemDTO]).self) { group in
+                let clientRef = client
+                let policy = client.userPolicy
+                for library in fetchedLibraries {
+                    let libraryId = library.id
+                    group.addTask {
+                        do {
+                            let items = try await clientRef.getLatestItems(parentId: libraryId)
+                            return (libraryId, Self.filter(items, policy: policy))
+                        } catch {
+                            return (libraryId, [])
+                        }
                     }
                 }
+                for await (id, items) in group {
+                    byLibrary[id] = items
+                }
             }
+            latestItemsByLibrary = byLibrary
+            resumeItems = await resumeFetch
         } catch {
             self.error = "Failed to load home: \(error.localizedDescription)"
         }
@@ -117,30 +137,22 @@ final class HomeViewModel {
 
     // MARK: - Private Helpers
 
-    private func loadResumeItems() async {
+    private func fetchResumeItems() async -> [MediaItemDTO] {
         do {
             let items = try await client.getResumeItems()
-            resumeItems = filterByParentalRating(items)
+            return Self.filter(items, policy: client.userPolicy)
         } catch {
             // Non-fatal: the "Continue Watching" row simply won't appear.
-            resumeItems = []
-        }
-    }
-
-    private func loadLatestItems(for library: LibraryDTO) async {
-        do {
-            let items = try await client.getLatestItems(parentId: library.id)
-            latestItemsByLibrary[library.id] = filterByParentalRating(items)
-        } catch {
-            // Non-fatal: the section for this library simply won't appear.
-            latestItemsByLibrary[library.id] = []
+            return []
         }
     }
 
     /// Filters items client-side based on the user's parental rating policy.
     /// This is a safety layer on top of server-side filtering.
-    private func filterByParentalRating(_ items: [MediaItemDTO]) -> [MediaItemDTO] {
-        guard let policy = client.userPolicy, policy.maxParentalRating != nil else {
+    /// Static so it's safe to call from background tasks in `withTaskGroup`
+    /// without touching `self`.
+    private static func filter(_ items: [MediaItemDTO], policy: UserPolicy?) -> [MediaItemDTO] {
+        guard let policy, policy.maxParentalRating != nil else {
             return items
         }
         return items.filter { policy.isRatingAllowed($0.officialRating) }
