@@ -97,6 +97,17 @@ private let stubLogger = Logger(subsystem: "com.hypr.tv", category: "VLCStub")
     @objc var isPlaying: Bool = false
     @objc var canPause: Bool = false
 
+    /// Playback speed multiplier (1.0 = normal). Simulator honours this by
+    /// scaling the tick interval so the UI reacts realistically.
+    @objc var rate: Float = 1.0 {
+        didSet {
+            if isPlaying { startTimer() }
+        }
+    }
+
+    /// Subtitle delay in microseconds (matches VLCKit's native type on device).
+    @objc var currentVideoSubTitleDelay: Int = 0
+
     // MARK: - Audio tracks
 
     @objc var currentAudioTrackIndex: Int32 = 0
@@ -170,7 +181,10 @@ private let stubLogger = Logger(subsystem: "com.hypr.tv", category: "VLCStub")
 
     private func startTimer() {
         stopTimer()
-        let interval = TimeInterval(Self.tickIntervalMs) / 1000.0
+        // Respect the stub `rate` so the simulated timeline advances at the
+        // same relative speed the real player would.
+        let effectiveRate = max(rate, 0.1)
+        let interval = TimeInterval(Self.tickIntervalMs) / 1000.0 / Double(effectiveRate)
         playbackTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             guard let self, self.isPlaying else { return }
             self.time.advance(by: Self.tickIntervalMs)

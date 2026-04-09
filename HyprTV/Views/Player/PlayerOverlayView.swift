@@ -3,15 +3,17 @@ import SwiftUI
 /// Transport controls overlay for the VLC video player on tvOS.
 /// Bottom-aligned layout: title → action buttons → progress bar → timestamps.
 /// Auto-hides after 5 seconds of inactivity. Toggle with Siri Remote click.
+///
+/// Track switching, playback speed, and stream info all live in
+/// `PlayerInfoPanel`, which the parent view summons via `onShowInfoPanel`.
 struct PlayerOverlayView: View {
 
     let viewModel: PlayerViewModel
     let vlcWrapper: VLCPlayerWrapper
     var currentItem: MediaItemDTO?
-    var onExternalSubtitleLoaded: ((URL) -> Void)?
+    /// Asks the parent view to present the Audio / Subtitles / Speed / Info panel.
+    var onShowInfoPanel: () -> Void
 
-    @State private var showAudioPicker = false
-    @State private var showSubtitlePicker = false
     @State private var isScrubbing = false
     @State private var scrubProgress: Double = 0
 
@@ -70,12 +72,6 @@ struct PlayerOverlayView: View {
             }
         }
         .foregroundStyle(.white)
-        .sheet(isPresented: $showAudioPicker) {
-            AudioTrackPickerView(vlcWrapper: vlcWrapper, viewModel: viewModel)
-        }
-        .sheet(isPresented: $showSubtitlePicker) {
-            SubtitlePickerView(vlcWrapper: vlcWrapper, viewModel: viewModel, onStyleChanged: nil)
-        }
     }
 
     // MARK: - Gradients
@@ -172,28 +168,46 @@ struct PlayerOverlayView: View {
             Spacer()
                 .frame(width: 40)
 
-            // Audio track picker
+            // Unified Audio / Subtitles / Info panel trigger. Mirrors the
+            // gesture hint ("swipe down") so users discover both entry points.
             Button {
-                showAudioPicker = true
-                viewModel.resetOverlayTimer()
+                onShowInfoPanel()
             } label: {
-                Image(systemName: "speaker.wave.2.fill")
-                    .font(.title3)
+                HStack(spacing: 10) {
+                    Image(systemName: "ellipsis.circle.fill")
+                        .font(.title3)
+                    Text("Audio & Subtitles")
+                        .font(.callout)
+                        .fontWeight(.semibold)
+                }
+                .padding(.horizontal, 18)
+                .padding(.vertical, 10)
+                .background(.white.opacity(0.18), in: Capsule())
             }
             .buttonStyle(.plain)
+            .accessibilityHint("Swipe down on the remote to open this panel quickly")
 
-            // Subtitle picker
-            Button {
-                showSubtitlePicker = true
-                viewModel.resetOverlayTimer()
-            } label: {
-                Image(systemName: "captions.bubble.fill")
-                    .font(.title3)
+            // Quick playback-speed indicator when not at 1×.
+            if abs(vlcWrapper.playbackRate - 1.0) > 0.01 {
+                Text(speedLabel)
+                    .font(.caption)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(.white, in: Capsule())
             }
-            .buttonStyle(.plain)
         }
         .padding(.horizontal, 60)
         .focusSection()
+    }
+
+    private var speedLabel: String {
+        let rate = vlcWrapper.playbackRate
+        if rate == rate.rounded() {
+            return "\(Int(rate))×"
+        }
+        return String(format: "%.2g×", rate)
     }
 
     // MARK: - Progress Bar

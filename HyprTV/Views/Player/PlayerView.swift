@@ -24,6 +24,11 @@ struct PlayerView: View {
     @State private var progressReportTask: Task<Void, Never>?
     @State private var hasStarted = false
 
+    /// Controls the Infuse-style Audio / Subtitles / Speed / Info panel.
+    @State private var showInfoPanel = false
+    /// Pause state to restore when the info panel is dismissed.
+    @State private var wasPlayingBeforePanel = false
+
     var body: some View {
         ZStack {
             // VLC video layer
@@ -31,21 +36,20 @@ struct PlayerView: View {
                 .ignoresSafeArea()
 
             // Buffering spinner (centered, shown when overlay is hidden)
-            if vlcWrapper.isBuffering && !overlayVisible {
+            if vlcWrapper.isBuffering && !overlayVisible && !showInfoPanel {
                 ProgressView()
                     .scaleEffect(1.5)
                     .tint(.white)
             }
 
-            // Transport overlay
-            if overlayVisible, let vm = viewModel {
+            // Transport overlay — hidden while the info panel is up so the
+            // two surfaces don't fight for focus.
+            if overlayVisible, !showInfoPanel, let vm = viewModel {
                 PlayerOverlayView(
                     viewModel: vm,
                     vlcWrapper: vlcWrapper,
                     currentItem: currentItem,
-                    onExternalSubtitleLoaded: { url in
-                        vlcWrapper.loadExternalSubtitle(url: url)
-                    }
+                    onShowInfoPanel: { presentInfoPanel() }
                 )
                 .transition(.opacity.animation(.easeInOut(duration: 0.25)))
             }
@@ -67,8 +71,8 @@ struct PlayerView: View {
                 .transition(.opacity)
             }
 
-            // Up Next overlay
-            if let vm = viewModel, vm.showUpNext, let nextEp = vm.nextEpisode {
+            // Up Next overlay (hidden while panel is open)
+            if !showInfoPanel, let vm = viewModel, vm.showUpNext, let nextEp = vm.nextEpisode {
                 VStack {
                     Spacer()
                     HStack {
@@ -85,14 +89,34 @@ struct PlayerView: View {
                 }
                 .transition(.move(edge: .trailing).combined(with: .opacity))
             }
+
+            // Infuse-style bottom panel — slides up over the video without
+            // dismissing playback. Triggered by swipe-down or by tapping the
+            // Audio/CC buttons in the transport overlay.
+            if showInfoPanel, let vm = viewModel {
+                PlayerInfoPanel(
+                    viewModel: vm,
+                    vlcWrapper: vlcWrapper,
+                    onClose: { dismissInfoPanel() }
+                )
+                .zIndex(100)
+            }
         }
         .background(Color.black)
         .ignoresSafeArea()
         .persistentSystemOverlays(.hidden)
+        .focusable(true)
         .onAppear { startPlayback() }
         .onDisappear { stopPlayback() }
         .onPlayPauseCommand { handlePlayPause() }
         .onExitCommand { handleMenuButton() }
+        .onMoveCommand { direction in
+            // Swipe / d-pad down on the Siri Remote summons the info panel,
+            // matching Infuse's gesture. Ignored while the panel is already
+            // open — inside the panel its own focus controls take over.
+            guard !showInfoPanel, direction == .down else { return }
+            presentInfoPanel()
+        }
         .onTapGesture { toggleOverlay() }
         .onChange(of: vlcWrapper.isPlaying) { _, playing in
             viewModel?.isPlaying = playing
@@ -106,6 +130,39 @@ struct PlayerView: View {
         .onChange(of: vlcWrapper.durationMs) { _, durationMs in
             viewModel?.duration = durationMs * 10_000 // ms → ticks
         }
+        .animation(.easeInOut(duration: 0.3), value: showInfoPanel)
+    }
+
+    // MARK: - Info Panel
+
+    private func presentInfoPanel() {
+        guard !showInfoPanel else { return }
+        // Cancel the auto-hide timer so the transport bar doesn't race the panel.
+        hideTask?.cancel()
+
+        wasPlayingBeforePanel = vlcWrapper.isPlaying
+        // Match Infuse's behaviour: pause the video so users can read info
+        // and swap tracks without missing dialogue.
+        vlcWrapper.pause()
+
+        overlayVisible = false
+        showInfoPanel = true
+    }
+
+    private func dismissInfoPanel() {
+        guard showInfoPanel else { return }
+        showInfoPanel = false
+
+        // Resume playback only if we paused it when opening.
+        if wasPlayingBeforePanel {
+            vlcWrapper.play()
+        }
+        wasPlayingBeforePanel = false
+
+        // Re-show the transport bar briefly so users can orient themselves.
+        overlayVisible = true
+        viewModel?.showOverlay = true
+        scheduleAutoHide()
     }
 
     // MARK: - Playback Lifecycle

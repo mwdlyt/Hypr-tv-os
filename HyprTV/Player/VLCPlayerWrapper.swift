@@ -40,6 +40,11 @@ final class VLCPlayerWrapper: NSObject {
     /// Currently selected subtitle track index (-1 = disabled).
     var selectedSubtitleTrackIndex: Int = -1
 
+    /// Playback speed multiplier (1.0 = normal). Backed by `VLCMediaPlayer.rate`.
+    var playbackRate: Float = 1.0
+    /// Subtitle timing offset in seconds. Positive = subtitles later, negative = earlier.
+    var subtitleDelaySeconds: Double = 0
+
     // MARK: - Video Surface
 
     /// The UIView that VLC renders video frames into.
@@ -230,6 +235,26 @@ final class VLCPlayerWrapper: NSObject {
         logger.debug("VLCPlayerWrapper: subtitle track set to \(index)")
     }
 
+    /// Sets the playback speed multiplier. 1.0 is normal, 0.5 is half, 2.0 is double.
+    /// Safe to call during playback — VLC retimes audio pitch automatically.
+    func setPlaybackRate(_ rate: Float) {
+        guard let player = mediaPlayer else { return }
+        let clamped = max(0.25, min(rate, 4.0))
+        player.rate = clamped
+        playbackRate = clamped
+        logger.debug("VLCPlayerWrapper: playback rate set to \(clamped)")
+    }
+
+    /// Shifts subtitle timing by `seconds`. Positive values push subtitles later.
+    /// VLC's API is in microseconds as `Int`, so we convert here.
+    func setSubtitleDelay(seconds: Double) {
+        guard let player = mediaPlayer else { return }
+        let micros = Int(seconds * 1_000_000)
+        player.currentVideoSubTitleDelay = micros
+        subtitleDelaySeconds = seconds
+        logger.debug("VLCPlayerWrapper: subtitle delay set to \(seconds)s")
+    }
+
     /// Loads an external subtitle file from a local file URL (e.g. downloaded from OpenSubtitles).
     func loadExternalSubtitle(fileURL: URL) {
         guard let player = mediaPlayer else { return }
@@ -279,6 +304,8 @@ final class VLCPlayerWrapper: NSObject {
         subtitleTracks = []
         selectedAudioTrackIndex = -1
         selectedSubtitleTrackIndex = -1
+        playbackRate = 1.0
+        subtitleDelaySeconds = 0
     }
 
     /// Reads audio and subtitle tracks from the VLC player and updates the

@@ -21,6 +21,13 @@ final class PlayerViewModel {
     var selectedAudioTrack: MediaStreamDTO?
     var selectedSubtitleTrack: MediaStreamDTO?
 
+    /// The primary video stream for the currently loaded media source.
+    /// Drives the Info panel's resolution, codec, and bitrate display.
+    var videoStream: MediaStreamDTO?
+    /// The media source selected for playback. Used by the Info panel to
+    /// surface container format, total bitrate, and file size.
+    var mediaSource: MediaSourceDTO?
+
     var playSessionId: String?
     var error: String?
 
@@ -335,10 +342,12 @@ final class PlayerViewModel {
     // MARK: - Private Helpers
 
     private func populateTracks(from source: MediaSourceDTO) {
+        mediaSource = source
         guard let streams = source.mediaStreams else { return }
 
         audioTracks = streams.filter { $0.type == .audio }
         subtitleTracks = streams.filter { $0.type == .subtitle }
+        videoStream = streams.first(where: { $0.type == .video })
 
         // Select default tracks.
         if let defaultAudio = audioTracks.first(where: { $0.isDefault == true }) {
