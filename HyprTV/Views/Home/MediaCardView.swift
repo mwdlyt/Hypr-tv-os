@@ -3,7 +3,7 @@ import SwiftUI
 /// Portrait poster card for a media item.
 /// Shows a tall 2:3 ratio poster with focus-driven scale and title reveal.
 /// Reports focus state to parent for backdrop changes.
-/// Displays watched checkmark and progress bar overlays.
+/// For episodes in Continue Watching: shows S{n}E{n} label + time remaining under poster.
 struct MediaCardView: View {
 
     let item: MediaItemDTO
@@ -17,7 +17,7 @@ struct MediaCardView: View {
         Button {
             router.navigate(to: .mediaDetail(itemId: item.id))
         } label: {
-            VStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .center, spacing: 8) {
                 // Portrait poster image with overlays
                 ZStack(alignment: .bottom) {
                     ZStack(alignment: .topTrailing) {
@@ -56,7 +56,6 @@ struct MediaCardView: View {
                 }
                 .frame(width: Constants.Layout.posterWidth, height: Constants.Layout.posterHeight)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
-                // Focus glow — subtle white border instead of system's big square
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
                         .strokeBorder(.white.opacity(isFocused ? 0.8 : 0), lineWidth: 2)
@@ -66,8 +65,8 @@ struct MediaCardView: View {
                     radius: isFocused ? 15 : 0
                 )
 
-                // Title + metadata below poster — always visible, expands on focus
-                VStack(spacing: 4) {
+                // Title + episode info + time remaining
+                VStack(spacing: 3) {
                     Text(displayTitle)
                         .font(.caption)
                         .fontWeight(.semibold)
@@ -75,9 +74,25 @@ struct MediaCardView: View {
                         .lineLimit(2)
                         .multilineTextAlignment(.center)
 
+                    // S1E4 — Episode Name (for episodes in Continue Watching)
+                    if let epLabel = episodeLabel {
+                        Text(epLabel)
+                            .font(.caption2)
+                            .foregroundStyle(.white.opacity(0.75))
+                            .lineLimit(2)
+                            .multilineTextAlignment(.center)
+                    }
+
+                    // "43m left" or "18:46 in"
+                    if let timeInfo = timeInfoLabel {
+                        Text(timeInfo)
+                            .font(.caption2)
+                            .foregroundStyle(.white.opacity(0.55))
+                    }
+
                     if isFocused {
                         HStack(spacing: 6) {
-                            if let year = item.productionYear {
+                            if item.type != .episode, let year = item.productionYear {
                                 Text(String(year))
                                     .font(.caption2)
                                     .foregroundStyle(.white.opacity(0.6))
@@ -106,18 +121,15 @@ struct MediaCardView: View {
                         .transition(.opacity)
                     }
                 }
-                .frame(width: Constants.Layout.posterWidth + 20) // slightly wider than poster for text
+                .frame(width: Constants.Layout.posterWidth + 20)
             }
         }
-        // Suppress the default tvOS button focus rectangle
         .buttonStyle(.borderless)
         .focused($isFocused)
         .scaleEffect(isFocused ? 1.08 : 1.0)
         .animation(.easeInOut(duration: 0.2), value: isFocused)
         .onChange(of: isFocused) { _, focused in
-            if focused {
-                onFocused?()
-            }
+            if focused { onFocused?() }
         }
     }
 
@@ -130,11 +142,47 @@ struct MediaCardView: View {
         return Double(ticks) / Double(totalTicks)
     }
 
+    /// Series name for episodes, item name for everything else.
     private var displayTitle: String {
         if item.type == .episode, let seriesName = item.seriesName {
             return seriesName
         }
         return item.name
+    }
+
+    /// "S1 · E4 — Episode Name" for episodes. Nil for movies/series.
+    private var episodeLabel: String? {
+        guard item.type == .episode else { return nil }
+        var parts: [String] = []
+        if let season = item.parentIndexNumber { parts.append("S\(season)") }
+        if let ep = item.indexNumber { parts.append("E\(ep)") }
+        let prefix = parts.joined(separator: " · ")
+        if !prefix.isEmpty, !item.name.isEmpty {
+            return "\(prefix) — \(item.name)"
+        } else if !prefix.isEmpty {
+            return prefix
+        }
+        return item.name
+    }
+
+    /// "43m left" when in progress, nil when not started or fully watched.
+    private var timeInfoLabel: String? {
+        guard let positionTicks = item.userData?.playbackPositionTicks,
+              let totalTicks = item.runTimeTicks,
+              positionTicks > 0, totalTicks > 0,
+              positionTicks < totalTicks else { return nil }
+
+        let remainingTicks = totalTicks - positionTicks
+        let remainingSecs = Int(remainingTicks / 10_000_000)
+        if remainingSecs <= 0 { return nil }
+
+        let hours = remainingSecs / 3600
+        let minutes = (remainingSecs % 3600) / 60
+        if hours > 0 {
+            return "\(hours)h \(minutes)m left"
+        } else {
+            return "\(max(1, minutes))m left"
+        }
     }
 
     private var posterURL: URL? {
